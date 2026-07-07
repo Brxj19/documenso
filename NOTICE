@@ -1,0 +1,15 @@
+This repository is a fork of Documenso.
+
+Upstream project:
+- Repository: https://github.com/documenso/documenso
+- License: AGPL-3.0-only (see `LICENSE`)
+
+This fork retains the upstream license, copyright notices, AGPL notices, and
+project attribution.
+
+Phase 0 additions in this fork are limited to reusable-signing-tool
+documentation, local-development guardrails, and supporting helper scripts for a
+generic integration layer that will continue to use the existing Documenso
+signing engine.
+
+No claim of endorsement by the upstream Documenso project is made.

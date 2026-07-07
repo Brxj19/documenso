@@ -72,5 +72,13 @@ scripts/bench-*
 # tmp
 tmp/
 
+# reusable signing tool local artifacts
+.local/reusable-signing-tool/certs/
+.local/reusable-signing-tool/test-pdfs/
+.local/reusable-signing-tool/signed-artifacts/
+.local/reusable-signing-tool/storage/
+.local/reusable-signing-tool/mail/
+.local/reusable-signing-tool/db-dumps/
+
 # opencode
 .opencode/package-lock.json
