@@ -92,8 +92,31 @@ Expected local endpoints:
 - App: `http://localhost:3000`
 - Health: `http://localhost:3000/api/health`
 - Certificate status: `http://localhost:3000/api/certificate-status`
+- Integration API V1 capabilities when enabled: `http://localhost:3000/api/v1/integration/capabilities`
 - Inbucket: `http://localhost:9000`
 - MinIO console: `http://localhost:9001`
+
+## Enable the Phase 1 Integration Facade
+
+Phase 1 adds a read-only, feature-gated integration discovery endpoint. It does
+not create documents, recipients, fields, signing sessions, artifacts, audit
+logs, or webhooks, and it does not change existing Documenso signing behavior.
+
+To enable it locally, add this to `.env`:
+
+```text
+INTEGRATION_API_V1_ENABLED="true"
+```
+
+The endpoint lives on the existing authenticated V1 API surface and therefore
+uses the same API token auth pattern as other `/api/v1/*` routes:
+
+```text
+GET /api/v1/integration/capabilities
+```
+
+When the flag is absent or set to anything other than `"true"`, the endpoint
+returns a not-found style response and exposes no capabilities.
 
 ## Baseline Signing Verification
 

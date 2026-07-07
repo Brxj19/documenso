@@ -4,6 +4,8 @@ import {
 } from '@documenso/trpc/server/template-router/schema';
 import { initContract } from '@ts-rest/core';
 
+import { INTEGRATION_API_V1_CAPABILITIES_ROUTE } from './integration/route';
+import { ZIntegrationApiV1HealthResponseSchema } from './integration/schema';
 import {
   ZAuthorizationHeadersSchema,
   ZCreateDocumentFromTemplateMutationResponseSchema,
@@ -47,6 +49,19 @@ const deprecatedDescription =
 
 export const ApiContractV1 = c.router(
   {
+    getIntegrationCapabilities: {
+      method: 'GET',
+      path: INTEGRATION_API_V1_CAPABILITIES_ROUTE,
+      responses: {
+        200: ZIntegrationApiV1HealthResponseSchema,
+        401: ZUnsuccessfulResponseSchema,
+        404: ZUnsuccessfulResponseSchema,
+      },
+      summary: 'Get integration API V1 health and capabilities',
+      description:
+        'Read-only discovery endpoint for the reusable signing-tool integration facade. Phase 1 exposes only health and capabilities and performs no document, recipient, signing, storage, audit, or webhook mutations.',
+    },
+
     getDocuments: {
       method: 'GET',
       path: '/api/v1/documents',
