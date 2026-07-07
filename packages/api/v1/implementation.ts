@@ -45,9 +45,12 @@ import { mapSecondaryIdToDocumentId, mapSecondaryIdToTemplateId } from '@documen
 import { prisma } from '@documenso/prisma';
 
 import { ApiContractV1 } from './contract';
+import { getIntegrationApiV1CapabilitiesRoute } from './integration/route';
 import { authenticatedMiddleware } from './middleware/authenticated';
 
 export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
+  getIntegrationCapabilities: authenticatedMiddleware(async () => getIntegrationApiV1CapabilitiesRoute()),
+
   getDocuments: authenticatedMiddleware(async (args, user, team) => {
     const page = Number(args.query.page) || 1;
     const perPage = Number(args.query.perPage) || 10;

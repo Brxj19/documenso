@@ -17,6 +17,8 @@ export const NEXT_PRIVATE_INTERNAL_WEBAPP_URL = () =>
 
 export const IS_BILLING_ENABLED = () => env('NEXT_PUBLIC_FEATURE_BILLING_ENABLED') === 'true';
 
+export const IS_INTEGRATION_API_V1_ENABLED = () => env('INTEGRATION_API_V1_ENABLED') === 'true';
+
 export const API_V2_BETA_URL = '/api/v2-beta';
 export const API_V2_URL = '/api/v2';
 
