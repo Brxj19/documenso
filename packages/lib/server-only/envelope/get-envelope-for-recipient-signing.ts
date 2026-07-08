@@ -14,6 +14,7 @@ import { ZEnvelopeFieldSchema, ZFieldSchema } from '../../types/field';
 import { ZRecipientLiteSchema } from '../../types/recipient';
 import { isRecipientExpired } from '../../utils/recipients';
 import { isRecipientAuthorized } from '../document/is-recipient-authorized';
+import { isRecipientBlockedBySequentialSigningOrder } from '../recipient/sequential-signing-order';
 import { getTeamSettings } from '../team/get-team-settings';
 
 export type GetRecipientEnvelopeByTokenOptions = {
@@ -260,18 +261,13 @@ export const getEnvelopeForRecipientSigning = async ({
     },
   });
 
-  let isRecipientsTurn = true;
-
-  const currentRecipientIndex = envelope.recipients.findIndex((r) => r.token === token);
-
-  if (envelope.documentMeta.signingOrder === DocumentSigningOrder.SEQUENTIAL && currentRecipientIndex !== -1) {
-    for (let i = 0; i < currentRecipientIndex; i++) {
-      if (envelope.recipients[i].signingStatus !== SigningStatus.SIGNED) {
-        isRecipientsTurn = false;
-        break;
-      }
-    }
-  }
+  const isRecipientsTurn =
+    envelope.documentMeta.signingOrder !== DocumentSigningOrder.SEQUENTIAL
+      ? true
+      : !isRecipientBlockedBySequentialSigningOrder({
+          recipients: envelope.recipients,
+          recipientId: recipient.id,
+        });
 
   const sender = settings.includeSenderDetails
     ? {

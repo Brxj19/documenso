@@ -32,13 +32,33 @@ const STATUS_LABELS = {
   FAILED: msg`Failed`,
 } as const;
 
+const STAGE_STATUS_LABELS = {
+  WAITING: msg`Waiting`,
+  ACTIVE: msg`Active`,
+  PARTIALLY_COMPLETED: msg`Partially Completed`,
+  COMPLETED: msg`Completed`,
+  BLOCKED: msg`Blocked`,
+  REJECTED: msg`Rejected`,
+  EXPIRED: msg`Expired`,
+  CANCELLED: msg`Cancelled`,
+  FAILED: msg`Failed`,
+} as const;
+
 const PARTICIPANT_STATUS_LABELS = {
-  NOT_STARTED: msg`Not Started`,
-  IN_PROGRESS: msg`In Progress`,
-  WAITING_FOR_TURN: msg`Waiting For Turn`,
+  WAITING: msg`Waiting`,
+  AVAILABLE: msg`Available`,
+  VIEWED: msg`Viewed`,
   COMPLETED: msg`Completed`,
   REJECTED: msg`Rejected`,
-  NOT_REQUIRED: msg`Read Only`,
+  EXPIRED: msg`Expired`,
+  CANCELLED: msg`Cancelled`,
+  FAILED: msg`Failed`,
+} as const;
+
+const BLOCKED_REASON_LABELS = {
+  REQUEST_NOT_ACTIVE: msg`Request not active yet`,
+  PREVIOUS_STAGE_INCOMPLETE: msg`Previous stage incomplete`,
+  REQUEST_TERMINATED: msg`Request terminated`,
 } as const;
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -111,6 +131,9 @@ export default function IntegrationSigningRequestPage({ loaderData }: Route.Comp
             <DetailsCard label={<Trans>Updated at</Trans>}>
               <DetailsValue isMono={false}>{formatDateTime(signingRequest.updatedAt)}</DetailsValue>
             </DetailsCard>
+            <DetailsCard label={<Trans>Routing policy</Trans>}>
+              <DetailsValue>ALL_REQUIRED</DetailsValue>
+            </DetailsCard>
           </CardContent>
         </Card>
 
@@ -158,8 +181,26 @@ export default function IntegrationSigningRequestPage({ loaderData }: Route.Comp
                       <p className="text-muted-foreground text-sm">
                         <Trans>Native signing order:</Trans> {stage.nativeSigningOrder}
                       </p>
+                      <p className="text-muted-foreground text-sm">
+                        <Trans>Completion policy:</Trans> {stage.completionPolicy}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">{t(STAGE_STATUS_LABELS[stage.status])}</Badge>
                     </div>
                   </div>
+
+                  {stage.blockedReason ? (
+                    <p className="mt-3 text-muted-foreground text-sm">
+                      <Trans>Blocked reason:</Trans> {t(BLOCKED_REASON_LABELS[stage.blockedReason])}
+                    </p>
+                  ) : null}
+
+                  {stage.completedAt ? (
+                    <p className="mt-2 text-muted-foreground text-sm">
+                      <Trans>Completed at:</Trans> {formatDateTime(stage.completedAt)}
+                    </p>
+                  ) : null}
 
                   <div className="mt-4 grid gap-3">
                     {participants.map((participant) => (
@@ -179,6 +220,30 @@ export default function IntegrationSigningRequestPage({ loaderData }: Route.Comp
                             <Badge variant="secondary">{t(PARTICIPANT_STATUS_LABELS[participant.status])}</Badge>
                           </div>
                         </div>
+
+                        <div className="mt-3 flex flex-wrap gap-4 text-muted-foreground text-sm">
+                          <span>
+                            <Trans>Actionable:</Trans> {participant.isActionable ? 'Yes' : 'No'}
+                          </span>
+                          <span>
+                            <Trans>Native order:</Trans> {participant.nativeSigningOrder ?? 'Not available'}
+                          </span>
+                          <span>
+                            <Trans>Status updated:</Trans> {formatDateTime(participant.statusUpdatedAt)}
+                          </span>
+                        </div>
+
+                        {participant.blockedReason ? (
+                          <p className="mt-2 text-muted-foreground text-sm">
+                            <Trans>Blocked reason:</Trans> {t(BLOCKED_REASON_LABELS[participant.blockedReason])}
+                          </p>
+                        ) : null}
+
+                        {participant.completedAt ? (
+                          <p className="mt-2 text-muted-foreground text-sm">
+                            <Trans>Completed at:</Trans> {formatDateTime(participant.completedAt)}
+                          </p>
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -211,11 +276,72 @@ export default function IntegrationSigningRequestPage({ loaderData }: Route.Comp
                       <Badge variant="secondary">{t(PARTICIPANT_STATUS_LABELS[participant.status])}</Badge>
                     </div>
                   </div>
+
+                  <div className="mt-3 flex flex-wrap gap-4 text-muted-foreground text-sm">
+                    <span>
+                      <Trans>Status updated:</Trans> {formatDateTime(participant.statusUpdatedAt)}
+                    </span>
+                    <span>
+                      <Trans>Actionable:</Trans> {participant.isActionable ? 'Yes' : 'No'}
+                    </span>
+                  </div>
                 </div>
               ))}
             </CardContent>
           </Card>
         ) : null}
+
+        <Card className="rounded-xl">
+          <CardHeader>
+            <CardTitle>
+              <Trans>Participant Timeline</Trans>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {signingRequest.timeline.map((entry) => (
+              <div key={entry.participantId} className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-foreground">{entry.displayName ?? entry.email}</p>
+                    <p className="text-muted-foreground text-sm">{entry.email}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="neutral">{entry.role}</Badge>
+                    <Badge variant="secondary">{t(PARTICIPANT_STATUS_LABELS[entry.status])}</Badge>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-4 text-muted-foreground text-sm">
+                  <span>
+                    <Trans>Stage:</Trans> {entry.stageOrder ?? 'Read only'}
+                  </span>
+                  <span>
+                    <Trans>Stage status:</Trans>{' '}
+                    {entry.stageStatus ? t(STAGE_STATUS_LABELS[entry.stageStatus]) : 'Not available'}
+                  </span>
+                  <span>
+                    <Trans>Native order:</Trans> {entry.nativeSigningOrder ?? 'Not available'}
+                  </span>
+                </div>
+
+                <div className="mt-2 flex flex-wrap gap-4 text-muted-foreground text-sm">
+                  <span>
+                    <Trans>Status updated:</Trans> {formatDateTime(entry.statusUpdatedAt)}
+                  </span>
+                  <span>
+                    <Trans>Completed at:</Trans> {formatDateTime(entry.completedAt)}
+                  </span>
+                </div>
+
+                {entry.blockedReason ? (
+                  <p className="mt-2 text-muted-foreground text-sm">
+                    <Trans>Blocked reason:</Trans> {t(BLOCKED_REASON_LABELS[entry.blockedReason])}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

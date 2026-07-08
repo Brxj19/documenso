@@ -51,7 +51,7 @@ describe('integration api v1 route', () => {
         maximum: 1,
         multipleDocuments: false,
       },
-      releasePhase: 'PHASE_2_SIGNING_REQUESTS',
+      releasePhase: 'PHASE_3_STAGE_ORCHESTRATION',
     });
   });
 

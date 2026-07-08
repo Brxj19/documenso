@@ -10,6 +10,7 @@ import {
 export const INTEGRATION_API_V1_CAPABILITIES_ROUTE = '/api/v1/integration/capabilities';
 export const INTEGRATION_API_V1_SIGNING_REQUESTS_ROUTE = '/api/v1/integration/signing-requests';
 export const INTEGRATION_API_V1_SIGNING_REQUEST_ROUTE = '/api/v1/integration/signing-requests/:requestId';
+export const INTEGRATION_API_V1_SIGNING_REQUEST_SEND_ROUTE = '/api/v1/integration/signing-requests/:requestId/send';
 
 export const getIntegrationApiV1Capabilities = (): TIntegrationApiV1CapabilitySchema =>
   ZIntegrationApiV1CapabilitySchema.parse({
@@ -23,7 +24,7 @@ export const getIntegrationApiV1Capabilities = (): TIntegrationApiV1CapabilitySc
       maximum: 1,
       multipleDocuments: false,
     },
-    releasePhase: 'PHASE_2_SIGNING_REQUESTS',
+    releasePhase: 'PHASE_3_STAGE_ORCHESTRATION',
   });
 
 export const getIntegrationApiV1HealthResponse = (): TIntegrationApiV1HealthResponseSchema =>

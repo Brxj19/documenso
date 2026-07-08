@@ -7,6 +7,7 @@ import { initContract } from '@ts-rest/core';
 import {
   INTEGRATION_API_V1_CAPABILITIES_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUEST_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUEST_SEND_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUESTS_ROUTE,
 } from './integration/route';
 import {
@@ -100,6 +101,22 @@ export const ApiContractV1 = c.router(
       summary: 'Get the normalized status for a signing request',
       description:
         'Returns the normalized request status, source-document verification details, staged participant mapping, and safe native-document references for a previously created signing request.',
+    },
+
+    sendIntegrationSigningRequest: {
+      method: 'POST',
+      path: INTEGRATION_API_V1_SIGNING_REQUEST_SEND_ROUTE,
+      body: ZNoBodyMutationSchema,
+      responses: {
+        200: ZIntegrationApiV1SigningRequestResponseSchema,
+        400: ZUnsuccessfulResponseSchema,
+        401: ZUnsuccessfulResponseSchema,
+        404: ZUnsuccessfulResponseSchema,
+        500: ZUnsuccessfulResponseSchema,
+      },
+      summary: 'Activate an integration signing request',
+      description:
+        'Transitions a previously created integration signing request from READY into the native Documenso send/sign lifecycle without creating duplicate sends on retry. The route stays feature-gated, team-scoped, and returns the normalized request, stage, and participant timeline view.',
     },
 
     getDocuments: {
