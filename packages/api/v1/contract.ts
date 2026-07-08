@@ -9,9 +9,12 @@ import {
   INTEGRATION_API_V1_SIGNING_REQUEST_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUEST_SEND_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUESTS_ROUTE,
+  INTEGRATION_API_V1_SIGNING_SESSION_ROUTE,
 } from './integration/route';
 import {
   ZIntegrationApiV1CreateSigningRequestResponseSchema,
+  ZIntegrationApiV1CreateSigningSessionResponseSchema,
+  ZIntegrationApiV1CreateSigningSessionSchema,
   ZIntegrationApiV1HealthResponseSchema,
   ZIntegrationApiV1SigningRequestResponseSchema,
   ZIntegrationApiV1SigningRequestSchema,
@@ -69,7 +72,7 @@ export const ApiContractV1 = c.router(
       },
       summary: 'Get integration API V1 health and capabilities',
       description:
-        'Discovery endpoint for the reusable signing-tool integration facade. Phase 2 exposes the single-document signing-request create and status surfaces while remaining provider-neutral and leaving native send/sign flows unchanged.',
+        'Discovery endpoint for the reusable signing-tool integration facade. Phase 4 adds recipient-scoped signing sessions, redirect launch support, safe return URL allowlisting, and session-expiry enforcement while continuing to reuse Documenso’s native signing experience.',
     },
 
     createIntegrationSigningRequest: {
@@ -117,6 +120,22 @@ export const ApiContractV1 = c.router(
       summary: 'Activate an integration signing request',
       description:
         'Transitions a previously created integration signing request from READY into the native Documenso send/sign lifecycle without creating duplicate sends on retry. The route stays feature-gated, team-scoped, and returns the normalized request, stage, and participant timeline view.',
+    },
+
+    createIntegrationSigningSession: {
+      method: 'POST',
+      path: INTEGRATION_API_V1_SIGNING_SESSION_ROUTE,
+      body: ZIntegrationApiV1CreateSigningSessionSchema,
+      responses: {
+        200: ZIntegrationApiV1CreateSigningSessionResponseSchema,
+        400: ZUnsuccessfulResponseSchema,
+        401: ZUnsuccessfulResponseSchema,
+        404: ZUnsuccessfulResponseSchema,
+        500: ZUnsuccessfulResponseSchema,
+      },
+      summary: 'Create a recipient-scoped signing session',
+      description:
+        'Creates a bounded redirect-mode signing session for one currently actionable participant on an active integration signing request. The response returns a launch URL that validates expiry, participant scope, and safe return URL handling before redirecting into the native Documenso signer.',
     },
 
     getDocuments: {

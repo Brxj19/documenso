@@ -557,6 +557,11 @@ enum IntegrationSigningRequestStatus {
   FAILED
 }
 
+enum IntegrationSigningSessionMode {
+  REDIRECT
+  EMBED
+}
+
 model DocumentData {
   id           String           @id @default(cuid())
   type         DocumentDataType
@@ -671,6 +676,7 @@ model Recipient {
   cscCredential CscCredential?
   cscSession    CscSession?
   integrationSigningRequestParticipant IntegrationSigningRequestParticipant?
+  integrationSigningSessions           IntegrationSigningSession[]
 
   @@index([token])
   @@index([email])
@@ -722,6 +728,7 @@ model IntegrationSigningRequest {
 
   stages       IntegrationSigningRequestStage[]
   participants IntegrationSigningRequestParticipant[]
+  sessions     IntegrationSigningSession[]
 
   @@unique([teamId, idempotencyKey], map: "IntegrationSigningRequest_teamId_idempotencyKey_key")
   @@index([teamId, externalReference], map: "IntegrationSigningRequest_teamId_externalReference_idx")
@@ -767,10 +774,37 @@ model IntegrationSigningRequestParticipant {
   signingRequest IntegrationSigningRequest @relation(fields: [signingRequestId], references: [id], onDelete: Cascade)
   stage          IntegrationSigningRequestStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
   nativeRecipient Recipient? @relation(fields: [nativeRecipientId], references: [id], onDelete: SetNull)
+  signingSessions IntegrationSigningSession[]
 
   @@unique([signingRequestId, participantId], map: "IntegrationReqParticipant_requestId_participantId_key")
   @@index([signingRequestId, stageId], map: "IntegrationReqParticipant_requestId_stageId_idx")
   @@index([signingRequestId, role], map: "IntegrationReqParticipant_requestId_role_idx")
+}
+
+model IntegrationSigningSession {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  signingRequestId            String
+  signingRequestParticipantId String
+  nativeRecipientId           Int
+
+  mode        IntegrationSigningSessionMode @default(REDIRECT)
+  returnUrl   String?
+  clientState String?
+  expiresAt   DateTime
+  launchedAt  DateTime?
+  completedAt DateTime?
+
+  signingRequest IntegrationSigningRequest            @relation(fields: [signingRequestId], references: [id], onDelete: Cascade)
+  participant    IntegrationSigningRequestParticipant @relation(fields: [signingRequestParticipantId], references: [id], onDelete: Cascade)
+  nativeRecipient Recipient                           @relation(fields: [nativeRecipientId], references: [id], onDelete: Cascade)
+
+  @@index([signingRequestId], map: "IntegrationSigningSession_signingRequestId_idx")
+  @@index([signingRequestParticipantId], map: "IntegrationSigningSession_participantId_idx")
+  @@index([nativeRecipientId], map: "IntegrationSigningSession_nativeRecipientId_idx")
+  @@index([expiresAt], map: "IntegrationSigningSession_expiresAt_idx")
 }
 
 enum FieldType {

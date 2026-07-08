@@ -51,6 +51,7 @@ import {
   getIntegrationApiV1SigningRequest,
   sendIntegrationApiV1SigningRequest,
 } from './integration/signing-requests';
+import { createIntegrationApiV1SigningSession } from './integration/signing-sessions';
 import { authenticatedMiddleware } from './middleware/authenticated';
 
 export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
@@ -206,6 +207,60 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
     }
   }),
 
+  createIntegrationSigningSession: authenticatedMiddleware(async (args, _user, team) => {
+    if (!IS_INTEGRATION_API_V1_ENABLED()) {
+      return {
+        status: 404,
+        body: {
+          message: 'Not found',
+        },
+      };
+    }
+
+    try {
+      const body = await createIntegrationApiV1SigningSession({
+        requestId: args.params.requestId,
+        participantId: args.params.participantId,
+        teamId: team.id,
+        request: args.body,
+      });
+
+      return {
+        status: 200,
+        body,
+      };
+    } catch (error) {
+      const appError = AppError.parseError(error);
+
+      if (appError.code === 'INVALID_REQUEST' || appError.code === 'INVALID_BODY') {
+        return {
+          status: 400,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      if (appError.code === 'NOT_FOUND') {
+        return {
+          status: 404,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      console.error(error);
+
+      return {
+        status: 500,
+        body: {
+          message: 'Failed to create signing session',
+        },
+      };
+    }
+  }),
+
   getDocuments: authenticatedMiddleware(async (args, user, team) => {
     const page = Number(args.query.page) || 1;
     const perPage = Number(args.query.perPage) || 10;
@@ -293,7 +348,7 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
           const result = ZFieldMetaSchema.safeParse(field.fieldMeta);
 
           if (!result.success) {
-            throw new Error('Field meta parsing failed for field ' + field.id);
+            throw new Error(`Field meta parsing failed for field ${field.id}`);
           }
 
           parsedMetaOrNull = result.data;
@@ -337,7 +392,7 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
           fields: parsedMetaFields,
         },
       };
-    } catch (err) {
+    } catch (_err) {
       return {
         status: 404,
         body: {
@@ -429,7 +484,7 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
         status: 200,
         body: { downloadUrl: url },
       };
-    } catch (err) {
+    } catch (_err) {
       return {
         status: 500,
         body: {
@@ -494,7 +549,7 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
           completedAt: deletedDocument.completedAt,
         },
       };
-    } catch (err) {
+    } catch (_err) {
       return {
         status: 404,
         body: {
@@ -631,7 +686,7 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
           })),
         },
       };
-    } catch (err) {
+    } catch (_err) {
       return {
         status: 404,
         body: {
@@ -744,7 +799,7 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
           template: fullTemplate,
         },
       };
-    } catch (err) {
+    } catch (_err) {
       return {
         status: 404,
         body: {
@@ -788,7 +843,7 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
           updatedAt: deletedTemplate.updatedAt,
         },
       };
-    } catch (err) {
+    } catch (_err) {
       return {
         status: 404,
         body: {
@@ -1224,7 +1279,7 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
           message: 'Document resend successfully initiated',
         },
       };
-    } catch (err) {
+    } catch {
       return {
         status: 500,
         body: {
@@ -1332,7 +1387,7 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
           signingUrl: `${NEXT_PUBLIC_WEBAPP_URL()}/sign/${newRecipient.token}`,
         },
       };
-    } catch (err) {
+    } catch {
       return {
         status: 500,
         body: {
@@ -1518,7 +1573,7 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
     }
 
     try {
-      const createdFields = await prisma.$transaction(async (tx) => {
+      const createdFields = await prisma.$transaction((tx) => {
         return Promise.all(
           fields.map(async (fieldData) => {
             const { recipientId, type, pageNumber, pageWidth, pageHeight, pageX, pageY, fieldMeta } = fieldData;

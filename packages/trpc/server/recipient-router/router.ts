@@ -1,3 +1,4 @@
+import { assertIntegrationSigningSessionTokenAccess } from '@documenso/api/v1/integration/signing-sessions';
 import { prepareCscRecipientSigning } from '@documenso/ee/server-only/signing/csc/prepare-recipient-signing';
 import { completeDocumentWithToken } from '@documenso/lib/server-only/document/complete-document-with-token';
 import { rejectDocumentWithToken } from '@documenso/lib/server-only/document/reject-document-with-token';
@@ -566,13 +567,20 @@ export const recipientRouter = router({
     .input(ZCompleteDocumentWithTokenMutationSchema)
     .output(ZCompleteDocumentWithTokenResponseSchema)
     .mutation(async ({ input, ctx }) => {
-      const { token, documentId, accessAuthOptions, nextSigner, recipientOverride } = input;
+      const { token, documentId, integrationSessionId, accessAuthOptions, nextSigner, recipientOverride } = input;
 
       ctx.logger.info({
         input: {
           documentId,
         },
       });
+
+      if (integrationSessionId) {
+        await assertIntegrationSigningSessionTokenAccess({
+          sessionId: integrationSessionId,
+          token,
+        });
+      }
 
       // Branch on TSP envelopes before any SES side effects: TSP recipients
       // can't complete via this route — they go through the CSC sync sign

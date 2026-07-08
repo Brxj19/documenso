@@ -92,6 +92,7 @@ export const EnvelopeSignerCompleteDialog = () => {
       const result = await completeDocument({
         token: recipient.token,
         documentId: mapSecondaryIdToDocumentId(envelope.secondaryId),
+        integrationSessionId: searchParams.get('integrationSessionId') ?? undefined,
         accessAuthOptions,
         recipientOverride: recipientDetails,
         ...(nextSigner?.email && nextSigner?.name ? { nextSigner } : {}),
@@ -125,7 +126,11 @@ export const EnvelopeSignerCompleteDialog = () => {
         return;
       }
 
-      if (envelope.documentMeta.redirectUrl) {
+      const integrationSessionId = searchParams.get('integrationSessionId');
+
+      if (integrationSessionId) {
+        window.location.href = `/sign/integration/${integrationSessionId}/complete`;
+      } else if (envelope.documentMeta.redirectUrl) {
         window.location.href = envelope.documentMeta.redirectUrl;
       } else {
         window.location.href = `/sign/${recipient.token}/complete`;
@@ -152,7 +157,7 @@ export const EnvelopeSignerCompleteDialog = () => {
    */
   const handleDirectTemplateCompleteClick = async (
     nextSigner?: { name: string; email: string },
-    accessAuthOptions?: TRecipientAccessAuth,
+    _accessAuthOptions?: TRecipientAccessAuth,
     recipientDetails?: { name: string; email: string },
   ) => {
     try {

@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   ZIntegrationApiV1CapabilitySchema,
   ZIntegrationApiV1CreateSigningRequestResponseSchema,
+  ZIntegrationApiV1CreateSigningSessionResponseSchema,
+  ZIntegrationApiV1CreateSigningSessionSchema,
   ZIntegrationApiV1EventSchema,
   ZIntegrationApiV1SigningRequestResponseSchema,
   ZIntegrationApiV1SigningRequestSchema,
+  ZIntegrationApiV1SigningSessionModeSchema,
   ZIntegrationApiV1StageCompletionPolicySchema,
   ZIntegrationApiV1StatusSchema,
 } from './schema';
@@ -60,6 +63,7 @@ describe('integration api v1 schemas', () => {
 
     const statusResult = ZIntegrationApiV1StatusSchema.safeParse('COMPLETED');
     const policyResult = ZIntegrationApiV1StageCompletionPolicySchema.safeParse('ALL_REQUIRED');
+    const modeResult = ZIntegrationApiV1SigningSessionModeSchema.safeParse('REDIRECT');
 
     const eventResult = ZIntegrationApiV1EventSchema.safeParse({
       eventId: 'event-1',
@@ -78,12 +82,39 @@ describe('integration api v1 schemas', () => {
       supportsMutation: true,
       providerExecutionAvailable: false,
       supportedWorkflowModes: ['STAGED'],
+      supportedSigningModes: ['REDIRECT'],
+      redirectSigningSupported: true,
+      embeddedSigningSupported: false,
+      sessionExpirySupported: true,
+      returnUrlAllowlistSupported: true,
+      callbackEventsSupported: false,
       supportedDocumentCount: {
         minimum: 1,
         maximum: 1,
         multipleDocuments: false,
       },
-      releasePhase: 'PHASE_3_STAGE_ORCHESTRATION',
+      releasePhase: 'PHASE_4_SIGNING_SESSIONS',
+    });
+
+    const signingSessionRequestResult = ZIntegrationApiV1CreateSigningSessionSchema.safeParse({
+      returnUrl: 'http://localhost:3000/return',
+      mode: 'REDIRECT',
+      clientState: 'state-123',
+      ttlSeconds: 900,
+    });
+
+    const signingSessionResponseResult = ZIntegrationApiV1CreateSigningSessionResponseSchema.safeParse({
+      sessionId: 'integration_session_123',
+      requestId: 'integration_request_123',
+      participantId: 'participant-1',
+      mode: 'REDIRECT',
+      expiresAt: new Date().toISOString(),
+      launchUrl: 'http://localhost:3000/sign/integration/integration_session_123',
+      returnUrl: 'http://localhost:3000/return',
+      clientState: 'state-123',
+      participantStatus: 'AVAILABLE',
+      requestStatus: 'IN_PROGRESS',
+      embeddedSupported: false,
     });
 
     const responseResult = ZIntegrationApiV1SigningRequestResponseSchema.safeParse({
@@ -171,8 +202,11 @@ describe('integration api v1 schemas', () => {
     expect(requestResult.success).toBe(true);
     expect(statusResult.success).toBe(true);
     expect(policyResult.success).toBe(true);
+    expect(modeResult.success).toBe(true);
     expect(eventResult.success).toBe(true);
     expect(capabilityResult.success).toBe(true);
+    expect(signingSessionRequestResult.success).toBe(true);
+    expect(signingSessionResponseResult.success).toBe(true);
     expect(responseResult.success).toBe(true);
     expect(createResponseResult.success).toBe(true);
   });

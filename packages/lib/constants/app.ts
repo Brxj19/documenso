@@ -19,6 +19,12 @@ export const IS_BILLING_ENABLED = () => env('NEXT_PUBLIC_FEATURE_BILLING_ENABLED
 
 export const IS_INTEGRATION_API_V1_ENABLED = () => env('INTEGRATION_API_V1_ENABLED') === 'true';
 
+export const INTEGRATION_API_V1_RETURN_URL_ALLOWLIST = () =>
+  env('INTEGRATION_API_V1_RETURN_URL_ALLOWLIST')
+    ?.split(',')
+    .map((value) => value.trim())
+    .filter(Boolean) ?? [];
+
 export const API_V2_BETA_URL = '/api/v2-beta';
 export const API_V2_URL = '/api/v2';
 

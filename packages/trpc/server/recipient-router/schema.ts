@@ -161,6 +161,7 @@ export const ZSetTemplateRecipientsResponseSchema = z.object({
 export const ZCompleteDocumentWithTokenMutationSchema = z.object({
   token: z.string(),
   documentId: z.number(),
+  integrationSessionId: z.string().optional(),
   accessAuthOptions: ZRecipientAccessAuthSchema.optional(),
   nextSigner: z
     .object({
