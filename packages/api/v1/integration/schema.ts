@@ -144,6 +144,7 @@ export const ZIntegrationApiV1SigningRequestSchema = z
     expiresAt: z.coerce.date().optional(),
     idempotencyKey: z.string().min(1).max(255).optional(),
     correlationId: z.string().min(1).max(255).optional(),
+    clientCorrelationId: z.string().min(1).max(255).optional(),
     callback: z
       .object({
         url: ZUrlSchema,
@@ -264,25 +265,64 @@ export type TIntegrationApiV1SigningRequestSchema = z.infer<typeof ZIntegrationA
 
 export const ZIntegrationApiV1EventTypeSchema = z.enum([
   'REQUEST_CREATED',
-  'STATUS_CHANGED',
+  'REQUEST_SENT',
+  'SIGNING_SESSION_CREATED',
+  'SIGNING_SESSION_LAUNCHED',
   'PARTICIPANT_COMPLETED',
   'PARTICIPANT_REJECTED',
-  'REQUEST_EXPIRED',
-  'REQUEST_CANCELLED',
+  'REQUEST_PARTIALLY_COMPLETED',
+  'REQUEST_COMPLETED',
+  'REQUEST_REJECTED',
   'REQUEST_FAILED',
+  'FINAL_ARTIFACT_CAPTURED',
+  'CALLBACK_QUEUED',
+  'CALLBACK_DELIVERED',
+  'CALLBACK_FAILED',
+  'RECONCILIATION_REFRESHED',
+]);
+
+export const ZIntegrationApiV1EventSourceSchema = z.enum([
+  'API',
+  'SIGNING_SESSION',
+  'ENGINE_COMPLETION',
+  'RECONCILIATION',
+  'CALLBACK',
+  'SYSTEM',
+]);
+
+export const ZIntegrationApiV1ArtifactTypeSchema = z.enum(['SIGNED_PDF']);
+
+export const ZIntegrationApiV1ArtifactIntegrityStatusSchema = z.enum([
+  'HASH_VERIFIED',
+  'HASH_MISMATCH',
+  'SIGNATURE_VALIDATION_NOT_AVAILABLE',
+]);
+
+export const ZIntegrationApiV1CallbackDeliveryStateSchema = z.enum([
+  'PENDING',
+  'DELIVERING',
+  'DELIVERED',
+  'FAILED_RETRYABLE',
+  'FAILED_FINAL',
 ]);
 
 export const ZIntegrationApiV1EventSchema = z.object({
   eventId: z.string().min(1).max(120),
-  integrationRequestId: z.string().min(1).max(120),
-  externalReference: z.string().min(1).max(255).optional(),
-  providerReference: z.string().min(1).max(255).optional(),
+  requestId: z.string().min(1).max(120),
   eventType: ZIntegrationApiV1EventTypeSchema,
-  occurredAt: z.coerce.date(),
-  actorParticipantId: z.string().min(1).max(120).optional(),
+  source: ZIntegrationApiV1EventSourceSchema,
+  correlationId: z.string().min(1).max(255),
+  requestCorrelationId: z.string().min(1).max(255),
+  eventTimestamp: z.string().datetime(),
+  observedAt: z.string().datetime(),
+  participantId: z.string().min(1).max(120).optional(),
+  sessionId: z.string().min(1).max(120).optional(),
+  actorReference: z.string().min(1).max(255).optional(),
+  nativeEnvelopeId: z.string().min(1).max(120).optional(),
+  nativeRecipientId: z.number().int().positive().optional(),
+  nativeEventReference: z.string().min(1).max(255).optional(),
   statusBefore: ZIntegrationApiV1StatusSchema.optional(),
   statusAfter: ZIntegrationApiV1StatusSchema.optional(),
-  correlationId: z.string().min(1).max(255).optional(),
   metadata: ZIntegrationApiV1MetadataSchema.optional(),
 });
 
@@ -359,6 +399,7 @@ export const ZIntegrationApiV1SigningRequestResponseSchema = z.object({
   nativeDocument: ZIntegrationApiV1NativeDocumentReferenceSchema.optional(),
   expiresAt: z.string().datetime().optional(),
   correlationId: z.string().min(1).max(255).optional(),
+  clientCorrelationId: z.string().min(1).max(255).optional(),
   metadata: ZIntegrationApiV1MetadataSchema.optional(),
   stages: z.array(ZIntegrationApiV1SigningRequestStageResponseSchema).max(50),
   participants: z.array(ZIntegrationApiV1SigningRequestParticipantResponseSchema).max(50),
@@ -416,6 +457,87 @@ export type TIntegrationApiV1CreateSigningSessionResponseSchema = z.infer<
   typeof ZIntegrationApiV1CreateSigningSessionResponseSchema
 >;
 
+export const ZIntegrationApiV1CertificateMetadataSchema = z.object({
+  nativeCertificateReference: z.string().min(1).max(255).optional(),
+  certificatePdfAvailable: z.boolean(),
+  auditLogPdfAvailable: z.boolean(),
+  subject: z.string().min(1).max(255).optional(),
+  issuer: z.string().min(1).max(255).optional(),
+  serialNumber: z.string().min(1).max(255).optional(),
+  fingerprint: z.string().min(1).max(255).optional(),
+  validFrom: z.string().datetime().optional(),
+  validTo: z.string().datetime().optional(),
+  signingTimestamp: z.string().datetime().optional(),
+  verificationStatus: ZIntegrationApiV1ArtifactIntegrityStatusSchema,
+});
+
+export const ZIntegrationApiV1ArtifactSchema = z.object({
+  artifactId: z.string().min(1).max(120),
+  requestId: z.string().min(1).max(120),
+  artifactType: ZIntegrationApiV1ArtifactTypeSchema,
+  filename: z.string().min(1).max(255),
+  mimeType: z.literal('application/pdf'),
+  sizeBytes: z.number().int().positive(),
+  sha256: ZIntegrationApiV1DocumentHashSchema,
+  integrityStatus: ZIntegrationApiV1ArtifactIntegrityStatusSchema,
+  capturedAt: z.string().datetime(),
+  certificateMetadata: ZIntegrationApiV1CertificateMetadataSchema.optional(),
+});
+
+export type TIntegrationApiV1ArtifactSchema = z.infer<typeof ZIntegrationApiV1ArtifactSchema>;
+
+export const ZIntegrationApiV1CallbackDeliverySchema = z.object({
+  deliveryId: z.string().min(1).max(120),
+  eventId: z.string().min(1).max(120),
+  deliveryState: ZIntegrationApiV1CallbackDeliveryStateSchema,
+  targetUrl: z.string().url(),
+  payloadHash: z.string().regex(/^[a-f0-9]{64}$/),
+  attemptCount: z.number().int().min(0),
+  maxAttempts: z.number().int().positive(),
+  nextAttemptAt: z.string().datetime(),
+  lastAttemptAt: z.string().datetime().optional(),
+  lastHttpStatus: z.number().int().min(0).optional(),
+  lastErrorSummary: z.string().min(1).max(500).optional(),
+  deliveredAt: z.string().datetime().optional(),
+  lastAttemptCorrelationId: z.string().min(1).max(255).optional(),
+});
+
+export type TIntegrationApiV1CallbackDeliverySchema = z.infer<typeof ZIntegrationApiV1CallbackDeliverySchema>;
+
+export const ZIntegrationApiV1EvidenceResponseSchema = z.object({
+  requestId: z.string().min(1).max(120),
+  correlationId: z.string().min(1).max(255),
+  clientCorrelationId: z.string().min(1).max(255).optional(),
+  status: ZIntegrationApiV1StatusSchema,
+  timeline: z.array(ZIntegrationApiV1SigningRequestTimelineEntrySchema).max(50),
+  events: z.array(ZIntegrationApiV1EventSchema).max(500),
+  artifacts: z.array(ZIntegrationApiV1ArtifactSchema).max(10),
+  finalArtifact: ZIntegrationApiV1ArtifactSchema.optional(),
+  finalSha256: ZIntegrationApiV1DocumentHashSchema.optional(),
+  certificateMetadata: ZIntegrationApiV1CertificateMetadataSchema.optional(),
+  callbacks: z.object({
+    deliveries: z.array(ZIntegrationApiV1CallbackDeliverySchema).max(100),
+  }),
+  reconciliation: z.object({
+    lastReconciledAt: z.string().datetime().optional(),
+    lastEventObservedAt: z.string().datetime().optional(),
+  }),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  completedAt: z.string().datetime().optional(),
+  rejectedAt: z.string().datetime().optional(),
+});
+
+export type TIntegrationApiV1EvidenceResponseSchema = z.infer<typeof ZIntegrationApiV1EvidenceResponseSchema>;
+
+export const ZIntegrationApiV1ArtifactListResponseSchema = z.object({
+  requestId: z.string().min(1).max(120),
+  status: ZIntegrationApiV1StatusSchema,
+  artifacts: z.array(ZIntegrationApiV1ArtifactSchema).max(10),
+});
+
+export type TIntegrationApiV1ArtifactListResponseSchema = z.infer<typeof ZIntegrationApiV1ArtifactListResponseSchema>;
+
 export const ZIntegrationApiV1CapabilitySchema = z.object({
   apiVersion: z.literal('V1'),
   enabled: z.boolean(),
@@ -427,9 +549,17 @@ export const ZIntegrationApiV1CapabilitySchema = z.object({
   embeddedSigningSupported: z.literal(false),
   sessionExpirySupported: z.literal(true),
   returnUrlAllowlistSupported: z.literal(true),
-  callbackEventsSupported: z.literal(false),
+  callbackEventsSupported: z.literal(true),
+  evidenceEndpointSupported: z.literal(true),
+  finalArtifactMetadataSupported: z.literal(true),
+  finalArtifactDownloadSupported: z.literal(true),
+  callbackSigningSupported: z.literal(true),
+  callbackRetryOutboxSupported: z.literal(true),
+  reconciliationSupported: z.literal(true),
+  integrityVerificationTested: z.literal(true),
+  supportedCallbackModes: z.array(z.enum(['PER_REQUEST_URL'])).min(1),
   supportedDocumentCount: ZIntegrationApiV1DocumentCountCapabilitySchema,
-  releasePhase: z.literal('PHASE_4_SIGNING_SESSIONS'),
+  releasePhase: z.literal('PHASE_5_AUDIT_EVIDENCE_CALLBACKS'),
 });
 
 export type TIntegrationApiV1CapabilitySchema = z.infer<typeof ZIntegrationApiV1CapabilitySchema>;

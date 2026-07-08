@@ -55,6 +55,29 @@ const PARTICIPANT_STATUS_LABELS = {
   FAILED: msg`Failed`,
 } as const;
 
+const EVENT_SOURCE_LABELS = {
+  API: msg`API`,
+  SIGNING_SESSION: msg`Signing Session`,
+  ENGINE_COMPLETION: msg`Engine Completion`,
+  RECONCILIATION: msg`Reconciliation`,
+  CALLBACK: msg`Callback`,
+  SYSTEM: msg`System`,
+} as const;
+
+const CALLBACK_STATE_LABELS = {
+  PENDING: msg`Pending`,
+  DELIVERING: msg`Delivering`,
+  DELIVERED: msg`Delivered`,
+  FAILED_RETRYABLE: msg`Retry Scheduled`,
+  FAILED_FINAL: msg`Failed`,
+} as const;
+
+const INTEGRITY_STATUS_LABELS = {
+  HASH_VERIFIED: msg`Hash Verified`,
+  HASH_MISMATCH: msg`Hash Mismatch`,
+  SIGNATURE_VALIDATION_NOT_AVAILABLE: msg`Signature Validation Not Available`,
+} as const;
+
 const BLOCKED_REASON_LABELS = {
   REQUEST_NOT_ACTIVE: msg`Request not active yet`,
   PREVIOUS_STAGE_INCOMPLETE: msg`Previous stage incomplete`,
@@ -71,11 +94,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export default function IntegrationSigningRequestPage({ loaderData }: Route.ComponentProps) {
   const { t } = useLingui();
-  const { signingRequest, teamUrl } = loaderData;
+  const { evidence, signingRequest, teamUrl } = loaderData;
   const stagedParticipants = signingRequest.participants.filter((participant) => participant.stageOrder !== undefined);
   const observerParticipants = signingRequest.participants.filter(
     (participant) => participant.stageOrder === undefined,
   );
+  const finalArtifact = evidence.finalArtifact;
 
   return (
     <div className="mx-auto w-full max-w-screen-xl px-4 md:px-8">
@@ -155,6 +179,67 @@ export default function IntegrationSigningRequestPage({ loaderData }: Route.Comp
             </DetailsCard>
             <DetailsCard label={<Trans>Correlation ID</Trans>}>
               <DetailsValue>{signingRequest.correlationId ?? 'Not available'}</DetailsValue>
+            </DetailsCard>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <Card className="rounded-xl">
+          <CardHeader>
+            <CardTitle>
+              <Trans>Final Artifact</Trans>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <DetailsCard label={<Trans>Artifact status</Trans>}>
+              <DetailsValue>{finalArtifact ? 'Available' : 'Not available'}</DetailsValue>
+            </DetailsCard>
+            <DetailsCard label={<Trans>Filename</Trans>}>
+              <DetailsValue>{finalArtifact?.filename ?? 'Not available'}</DetailsValue>
+            </DetailsCard>
+            <DetailsCard label={<Trans>Final SHA-256</Trans>}>
+              <DetailsValue isSelectable>
+                {evidence.finalSha256?.value ? truncateHash(evidence.finalSha256.value) : 'Not available'}
+              </DetailsValue>
+            </DetailsCard>
+            <DetailsCard label={<Trans>Integrity</Trans>}>
+              <DetailsValue>
+                {finalArtifact ? t(INTEGRITY_STATUS_LABELS[finalArtifact.integrityStatus]) : 'Not available'}
+              </DetailsValue>
+            </DetailsCard>
+            <DetailsCard label={<Trans>Captured at</Trans>}>
+              <DetailsValue isMono={false}>{formatDateTime(finalArtifact?.capturedAt)}</DetailsValue>
+            </DetailsCard>
+            <DetailsCard label={<Trans>Callback deliveries</Trans>}>
+              <DetailsValue>{String(evidence.callbacks.deliveries.length)}</DetailsValue>
+            </DetailsCard>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl">
+          <CardHeader>
+            <CardTitle>
+              <Trans>Evidence Summary</Trans>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <DetailsCard label={<Trans>Request correlation</Trans>}>
+              <DetailsValue isSelectable>{evidence.correlationId}</DetailsValue>
+            </DetailsCard>
+            <DetailsCard label={<Trans>Client correlation</Trans>}>
+              <DetailsValue isSelectable>{evidence.clientCorrelationId ?? 'Not available'}</DetailsValue>
+            </DetailsCard>
+            <DetailsCard label={<Trans>Normalized events</Trans>}>
+              <DetailsValue>{String(evidence.events.length)}</DetailsValue>
+            </DetailsCard>
+            <DetailsCard label={<Trans>Last reconciled</Trans>}>
+              <DetailsValue isMono={false}>{formatDateTime(evidence.reconciliation.lastReconciledAt)}</DetailsValue>
+            </DetailsCard>
+            <DetailsCard label={<Trans>Certificate evidence</Trans>}>
+              <DetailsValue>
+                {evidence.certificateMetadata?.certificatePdfAvailable ? 'Certificate available' : 'Not available'}
+              </DetailsValue>
             </DetailsCard>
           </CardContent>
         </Card>
@@ -340,6 +425,84 @@ export default function IntegrationSigningRequestPage({ loaderData }: Route.Comp
                 ) : null}
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl">
+          <CardHeader>
+            <CardTitle>
+              <Trans>Event Timeline</Trans>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {evidence.events.map((event) => (
+              <div key={event.eventId} className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-foreground">{event.eventType}</p>
+                    <p className="text-muted-foreground text-sm">{t(EVENT_SOURCE_LABELS[event.source])}</p>
+                  </div>
+                  <Badge variant="secondary">
+                    {event.statusAfter ? t(STATUS_LABELS[event.statusAfter]) : t(STATUS_LABELS[signingRequest.status])}
+                  </Badge>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-4 text-muted-foreground text-sm">
+                  <span>
+                    <Trans>Occurred:</Trans> {formatDateTime(event.eventTimestamp)}
+                  </span>
+                  <span>
+                    <Trans>Observed:</Trans> {formatDateTime(event.observedAt)}
+                  </span>
+                  <span>
+                    <Trans>Participant:</Trans> {event.participantId ?? 'Not available'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl">
+          <CardHeader>
+            <CardTitle>
+              <Trans>Callback Deliveries</Trans>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {evidence.callbacks.deliveries.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                <Trans>No callback deliveries are queued for this request.</Trans>
+              </p>
+            ) : (
+              evidence.callbacks.deliveries.map((delivery) => (
+                <div key={delivery.deliveryId} className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{delivery.deliveryId}</p>
+                      <p className="text-muted-foreground text-sm">{delivery.targetUrl}</p>
+                    </div>
+                    <Badge variant="secondary">{t(CALLBACK_STATE_LABELS[delivery.deliveryState])}</Badge>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-4 text-muted-foreground text-sm">
+                    <span>
+                      <Trans>Attempts:</Trans> {delivery.attemptCount}/{delivery.maxAttempts}
+                    </span>
+                    <span>
+                      <Trans>Next attempt:</Trans> {formatDateTime(delivery.nextAttemptAt)}
+                    </span>
+                    <span>
+                      <Trans>Last HTTP status:</Trans> {delivery.lastHttpStatus ?? 'Not available'}
+                    </span>
+                  </div>
+
+                  {delivery.lastErrorSummary ? (
+                    <p className="mt-2 text-muted-foreground text-sm">{delivery.lastErrorSummary}</p>
+                  ) : null}
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>

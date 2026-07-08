@@ -1,3 +1,4 @@
+import { getIntegrationApiV1SigningRequestEvidence } from '@documenso/api/v1/integration/evidence';
 import { getIntegrationApiV1SigningRequest } from '@documenso/api/v1/integration/signing-requests';
 import { getSession } from '@documenso/auth/server/lib/utils/get-session';
 import { IS_INTEGRATION_API_V1_ENABLED } from '@documenso/lib/constants/app';
@@ -23,24 +24,39 @@ export const loadIntegrationSigningRequestPageData = async ({
     teamUrl,
   });
 
-  const signingRequest = await getIntegrationApiV1SigningRequest({
-    requestId,
-    teamId: team.id,
-  }).catch((error) => {
-    const appError = AppError.parseError(error);
+  const [signingRequest, evidence] = await Promise.all([
+    getIntegrationApiV1SigningRequest({
+      requestId,
+      teamId: team.id,
+    }).catch((error) => {
+      const appError = AppError.parseError(error);
 
-    if (appError.code === 'NOT_FOUND') {
-      return null;
-    }
+      if (appError.code === 'NOT_FOUND') {
+        return null;
+      }
 
-    throw error;
-  });
+      throw error;
+    }),
+    getIntegrationApiV1SigningRequestEvidence({
+      requestId,
+      teamId: team.id,
+    }).catch((error) => {
+      const appError = AppError.parseError(error);
 
-  if (!signingRequest) {
+      if (appError.code === 'NOT_FOUND') {
+        return null;
+      }
+
+      throw error;
+    }),
+  ]);
+
+  if (!signingRequest || !evidence) {
     throw new Response('Not Found', { status: 404 });
   }
 
   return {
+    evidence,
     signingRequest,
     teamUrl,
   };

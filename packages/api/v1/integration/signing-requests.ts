@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { INTEGRATION_API_V1_CALLBACK_URL_ALLOWLIST } from '@documenso/lib/constants/app';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import { sendDocument } from '@documenso/lib/server-only/document/send-document';
 import { createEnvelope } from '@documenso/lib/server-only/envelope/create-envelope';
@@ -31,10 +32,12 @@ import type {
   TIntegrationApiV1StageStatusSchema,
   TIntegrationApiV1StatusSchema,
 } from './schema';
+import { validateAbsoluteAllowlistedUrl } from './url-allowlist';
 
 type GetIntegrationSigningRequestOptions = {
   requestId: string;
   teamId: number;
+  skipReconciliation?: boolean;
 };
 
 type CreateIntegrationSigningRequestOptions = {
@@ -134,6 +137,14 @@ const createRequestFingerprint = (request: TIntegrationApiV1SigningRequestSchema
 
 const getSourceHashValue = (documentBytes: Uint8Array) => Buffer.from(sha256(documentBytes)).toString('hex');
 
+const validateIntegrationApiV1CallbackUrl = (value?: string | null) =>
+  validateAbsoluteAllowlistedUrl({
+    value,
+    allowlistValues: INTEGRATION_API_V1_CALLBACK_URL_ALLOWLIST(),
+    label: 'callback.url',
+    allowlistErrorMessage: 'callback.url is not allowlisted for integration callbacks.',
+  });
+
 const getParticipantStageOrderMap = (request: TIntegrationApiV1SigningRequestSchema) =>
   new Map(
     request.stages.flatMap((stage) =>
@@ -184,10 +195,11 @@ const reserveIntegrationSigningRequest = async ({
     status: IntegrationSigningRequestStatus.DRAFT,
     requestFingerprint,
     idempotencyKey: request.idempotencyKey,
-    correlationId: request.correlationId,
+    correlationId: prefixedId('integration_correlation'),
+    clientCorrelationId: request.clientCorrelationId ?? request.correlationId,
     expiresAt: request.expiresAt,
     metadata: request.metadata as Prisma.InputJsonValue | undefined,
-    callbackUrl: request.callback?.url,
+    callbackUrl: validateIntegrationApiV1CallbackUrl(request.callback?.url),
     callbackCorrelationId: request.callback?.correlationId,
     callbackMetadata: request.callback?.metadata as Prisma.InputJsonValue | undefined,
   } satisfies Prisma.IntegrationSigningRequestUncheckedCreateInput;
@@ -591,6 +603,7 @@ const buildSigningRequestResponse = async ({
       : undefined,
     expiresAt: toIsoString(integrationRequest.expiresAt),
     correlationId: integrationRequest.correlationId ?? undefined,
+    clientCorrelationId: integrationRequest.clientCorrelationId ?? undefined,
     metadata: (integrationRequest.metadata ?? undefined) as
       | TIntegrationApiV1SigningRequestResponseSchema['metadata']
       | undefined,

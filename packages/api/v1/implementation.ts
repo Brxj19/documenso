@@ -45,6 +45,10 @@ import { mapSecondaryIdToDocumentId, mapSecondaryIdToTemplateId } from '@documen
 import { prisma } from '@documenso/prisma';
 
 import { ApiContractV1 } from './contract';
+import {
+  getIntegrationApiV1SigningRequestArtifacts,
+  getIntegrationApiV1SigningRequestEvidence,
+} from './integration/evidence';
 import { getIntegrationApiV1CapabilitiesRoute } from './integration/route';
 import {
   createIntegrationApiV1SigningRequest,
@@ -149,6 +153,110 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
         status: 500,
         body: {
           message: 'Failed to load signing request',
+        },
+      };
+    }
+  }),
+
+  getIntegrationSigningRequestEvidence: authenticatedMiddleware(async (args, _user, team) => {
+    if (!IS_INTEGRATION_API_V1_ENABLED()) {
+      return {
+        status: 404,
+        body: {
+          message: 'Not found',
+        },
+      };
+    }
+
+    try {
+      const body = await getIntegrationApiV1SigningRequestEvidence({
+        requestId: args.params.requestId,
+        teamId: team.id,
+      });
+
+      return {
+        status: 200,
+        body,
+      };
+    } catch (error) {
+      const appError = AppError.parseError(error);
+
+      if (appError.code === 'INVALID_REQUEST' || appError.code === 'INVALID_BODY') {
+        return {
+          status: 400,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      if (appError.code === 'NOT_FOUND') {
+        return {
+          status: 404,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      console.error(error);
+
+      return {
+        status: 500,
+        body: {
+          message: 'Failed to load signing request evidence',
+        },
+      };
+    }
+  }),
+
+  getIntegrationSigningRequestArtifacts: authenticatedMiddleware(async (args, _user, team) => {
+    if (!IS_INTEGRATION_API_V1_ENABLED()) {
+      return {
+        status: 404,
+        body: {
+          message: 'Not found',
+        },
+      };
+    }
+
+    try {
+      const body = await getIntegrationApiV1SigningRequestArtifacts({
+        requestId: args.params.requestId,
+        teamId: team.id,
+      });
+
+      return {
+        status: 200,
+        body,
+      };
+    } catch (error) {
+      const appError = AppError.parseError(error);
+
+      if (appError.code === 'INVALID_REQUEST' || appError.code === 'INVALID_BODY') {
+        return {
+          status: 400,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      if (appError.code === 'NOT_FOUND') {
+        return {
+          status: 404,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      console.error(error);
+
+      return {
+        status: 500,
+        body: {
+          message: 'Failed to load signing request artifacts',
         },
       };
     }

@@ -25,6 +25,23 @@ export const INTEGRATION_API_V1_RETURN_URL_ALLOWLIST = () =>
     .map((value) => value.trim())
     .filter(Boolean) ?? [];
 
+export const INTEGRATION_API_V1_CALLBACK_URL_ALLOWLIST = () =>
+  env('INTEGRATION_API_V1_CALLBACK_URL_ALLOWLIST')
+    ?.split(',')
+    .map((value) => value.trim())
+    .filter(Boolean) ?? [];
+
+export const INTEGRATION_API_V1_CALLBACK_SIGNING_SECRET = () => env('INTEGRATION_API_V1_CALLBACK_SIGNING_SECRET');
+
+export const INTEGRATION_API_V1_CALLBACK_TIMEOUT_MS = () =>
+  Number(env('INTEGRATION_API_V1_CALLBACK_TIMEOUT_MS') ?? '10000');
+
+export const INTEGRATION_API_V1_CALLBACK_MAX_ATTEMPTS = () =>
+  Number(env('INTEGRATION_API_V1_CALLBACK_MAX_ATTEMPTS') ?? '5');
+
+export const INTEGRATION_API_V1_CALLBACK_RETRY_DELAY_MS = () =>
+  Number(env('INTEGRATION_API_V1_CALLBACK_RETRY_DELAY_MS') ?? '60000');
+
 export const API_V2_BETA_URL = '/api/v2-beta';
 export const API_V2_URL = '/api/v2';
 

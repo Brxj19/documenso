@@ -13,6 +13,9 @@ vi.mock('@documenso/lib/server-only/envelope/create-envelope', () => ({
 import {
   getIntegrationApiV1CapabilitiesRoute,
   INTEGRATION_API_V1_CAPABILITIES_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUEST_ARTIFACT_DOWNLOAD_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUEST_ARTIFACTS_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUEST_EVIDENCE_ROUTE,
   INTEGRATION_API_V1_SIGNING_SESSION_ROUTE,
 } from './route';
 
@@ -30,6 +33,15 @@ describe('integration api v1 route', () => {
       message: 'Not found',
     });
     expect(INTEGRATION_API_V1_CAPABILITIES_ROUTE).toBe('/api/v1/integration/capabilities');
+    expect(INTEGRATION_API_V1_SIGNING_REQUEST_EVIDENCE_ROUTE).toBe(
+      '/api/v1/integration/signing-requests/:requestId/evidence',
+    );
+    expect(INTEGRATION_API_V1_SIGNING_REQUEST_ARTIFACTS_ROUTE).toBe(
+      '/api/v1/integration/signing-requests/:requestId/artifacts',
+    );
+    expect(INTEGRATION_API_V1_SIGNING_REQUEST_ARTIFACT_DOWNLOAD_ROUTE).toBe(
+      '/api/v1/integration/signing-requests/:requestId/artifacts/:artifactId/download',
+    );
     expect(INTEGRATION_API_V1_SIGNING_SESSION_ROUTE).toBe(
       '/api/v1/integration/signing-requests/:requestId/participants/:participantId/signing-session',
     );
@@ -58,13 +70,21 @@ describe('integration api v1 route', () => {
       embeddedSigningSupported: false,
       sessionExpirySupported: true,
       returnUrlAllowlistSupported: true,
-      callbackEventsSupported: false,
+      callbackEventsSupported: true,
+      evidenceEndpointSupported: true,
+      finalArtifactMetadataSupported: true,
+      finalArtifactDownloadSupported: true,
+      callbackSigningSupported: true,
+      callbackRetryOutboxSupported: true,
+      reconciliationSupported: true,
+      integrityVerificationTested: true,
+      supportedCallbackModes: ['PER_REQUEST_URL'],
       supportedDocumentCount: {
         minimum: 1,
         maximum: 1,
         multipleDocuments: false,
       },
-      releasePhase: 'PHASE_4_SIGNING_SESSIONS',
+      releasePhase: 'PHASE_5_AUDIT_EVIDENCE_CALLBACKS',
     });
   });
 

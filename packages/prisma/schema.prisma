@@ -562,12 +562,58 @@ enum IntegrationSigningSessionMode {
   EMBED
 }
 
+enum IntegrationSigningEventType {
+  REQUEST_CREATED
+  REQUEST_SENT
+  SIGNING_SESSION_CREATED
+  SIGNING_SESSION_LAUNCHED
+  PARTICIPANT_COMPLETED
+  PARTICIPANT_REJECTED
+  REQUEST_PARTIALLY_COMPLETED
+  REQUEST_COMPLETED
+  REQUEST_REJECTED
+  REQUEST_FAILED
+  FINAL_ARTIFACT_CAPTURED
+  CALLBACK_QUEUED
+  CALLBACK_DELIVERED
+  CALLBACK_FAILED
+  RECONCILIATION_REFRESHED
+}
+
+enum IntegrationSigningEventSource {
+  API
+  SIGNING_SESSION
+  ENGINE_COMPLETION
+  RECONCILIATION
+  CALLBACK
+  SYSTEM
+}
+
+enum IntegrationSigningArtifactType {
+  SIGNED_PDF
+}
+
+enum IntegrationArtifactIntegrityStatus {
+  HASH_VERIFIED
+  HASH_MISMATCH
+  SIGNATURE_VALIDATION_NOT_AVAILABLE
+}
+
+enum IntegrationCallbackDeliveryState {
+  PENDING
+  DELIVERING
+  DELIVERED
+  FAILED_RETRYABLE
+  FAILED_FINAL
+}
+
 model DocumentData {
   id           String           @id @default(cuid())
   type         DocumentDataType
   data         String
   initialData  String
   envelopeItem EnvelopeItem?
+  integrationSigningArtifacts IntegrationSigningArtifact[]
 }
 
 enum DocumentDistributionMethod {
@@ -677,6 +723,7 @@ model Recipient {
   cscSession    CscSession?
   integrationSigningRequestParticipant IntegrationSigningRequestParticipant?
   integrationSigningSessions           IntegrationSigningSession[]
+  integrationSigningEvents             IntegrationSigningEvent[]
 
   @@index([token])
   @@index([email])
@@ -715,20 +762,25 @@ model IntegrationSigningRequest {
   requestFingerprint String
   idempotencyKey     String?
   correlationId      String?
+  clientCorrelationId String?
   expiresAt          DateTime?
 
   metadata              Json?
   callbackUrl           String?
   callbackCorrelationId String?
   callbackMetadata      Json?
+  lastReconciledAt      DateTime?
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   team     Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
   envelope Envelope? @relation(fields: [envelopeId], references: [id], onDelete: SetNull)
 
-  stages       IntegrationSigningRequestStage[]
-  participants IntegrationSigningRequestParticipant[]
-  sessions     IntegrationSigningSession[]
+  stages             IntegrationSigningRequestStage[]
+  participants       IntegrationSigningRequestParticipant[]
+  sessions           IntegrationSigningSession[]
+  events             IntegrationSigningEvent[]
+  artifacts          IntegrationSigningArtifact[]
+  callbackDeliveries IntegrationCallbackDelivery[]
 
   @@unique([teamId, idempotencyKey], map: "IntegrationSigningRequest_teamId_idempotencyKey_key")
   @@index([teamId, externalReference], map: "IntegrationSigningRequest_teamId_externalReference_idx")
@@ -775,6 +827,7 @@ model IntegrationSigningRequestParticipant {
   stage          IntegrationSigningRequestStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
   nativeRecipient Recipient? @relation(fields: [nativeRecipientId], references: [id], onDelete: SetNull)
   signingSessions IntegrationSigningSession[]
+  events          IntegrationSigningEvent[]
 
   @@unique([signingRequestId, participantId], map: "IntegrationReqParticipant_requestId_participantId_key")
   @@index([signingRequestId, stageId], map: "IntegrationReqParticipant_requestId_stageId_idx")
@@ -800,11 +853,105 @@ model IntegrationSigningSession {
   signingRequest IntegrationSigningRequest            @relation(fields: [signingRequestId], references: [id], onDelete: Cascade)
   participant    IntegrationSigningRequestParticipant @relation(fields: [signingRequestParticipantId], references: [id], onDelete: Cascade)
   nativeRecipient Recipient                           @relation(fields: [nativeRecipientId], references: [id], onDelete: Cascade)
+  events         IntegrationSigningEvent[]
 
   @@index([signingRequestId], map: "IntegrationSigningSession_signingRequestId_idx")
   @@index([signingRequestParticipantId], map: "IntegrationSigningSession_participantId_idx")
   @@index([nativeRecipientId], map: "IntegrationSigningSession_nativeRecipientId_idx")
   @@index([expiresAt], map: "IntegrationSigningSession_expiresAt_idx")
+}
+
+model IntegrationSigningEvent {
+  id        String   @id
+  createdAt DateTime @default(now())
+
+  signingRequestId            String
+  signingRequestParticipantId String?
+  signingSessionId            String?
+
+  eventType        IntegrationSigningEventType
+  source           IntegrationSigningEventSource
+  correlationId    String
+  deduplicationKey String
+
+  requestCorrelationId String
+  nativeEnvelopeId     String?
+  nativeRecipientId    Int?
+  nativeEventReference String?
+  actorReference       String?
+  statusBefore         IntegrationSigningRequestStatus?
+  statusAfter          IntegrationSigningRequestStatus?
+  eventTimestamp       DateTime
+  observedAt           DateTime @default(now())
+  metadata             Json?
+
+  signingRequest  IntegrationSigningRequest             @relation(fields: [signingRequestId], references: [id], onDelete: Cascade)
+  participant     IntegrationSigningRequestParticipant? @relation(fields: [signingRequestParticipantId], references: [id], onDelete: SetNull)
+  signingSession  IntegrationSigningSession?            @relation(fields: [signingSessionId], references: [id], onDelete: SetNull)
+  nativeRecipient Recipient?                           @relation(fields: [nativeRecipientId], references: [id], onDelete: SetNull)
+  callbackDelivery IntegrationCallbackDelivery?
+
+  @@unique([signingRequestId, deduplicationKey], map: "IntegrationSigningEvent_requestId_dedupe_key")
+  @@index([signingRequestId, eventTimestamp], map: "IntegrationSigningEvent_requestId_eventTime_idx")
+  @@index([signingRequestParticipantId], map: "IntegrationSigningEvent_participantId_idx")
+  @@index([signingSessionId], map: "IntegrationSigningEvent_sessionId_idx")
+  @@index([nativeRecipientId], map: "IntegrationSigningEvent_nativeRecipientId_idx")
+}
+
+model IntegrationSigningArtifact {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  signingRequestId String
+  envelopeId       String
+  envelopeItemId   String
+  documentDataId   String
+
+  artifactType     IntegrationSigningArtifactType
+  filename         String
+  mimeType         String
+  sizeBytes        Int
+  sha256Hash       String
+  integrityStatus  IntegrationArtifactIntegrityStatus
+  capturedAt       DateTime
+  certificateMetadata Json?
+
+  signingRequest IntegrationSigningRequest @relation(fields: [signingRequestId], references: [id], onDelete: Cascade)
+  documentData   DocumentData              @relation(fields: [documentDataId], references: [id], onDelete: Cascade)
+
+  @@unique([signingRequestId, artifactType], map: "IntegrationSigningArtifact_requestId_type_key")
+  @@index([signingRequestId, capturedAt], map: "IntegrationSigningArtifact_requestId_capturedAt_idx")
+  @@index([documentDataId], map: "IntegrationSigningArtifact_documentDataId_idx")
+}
+
+model IntegrationCallbackDelivery {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  signingRequestId String
+  eventId          String @unique
+
+  targetUrl        String
+  payload          Json
+  payloadHash      String
+  state            IntegrationCallbackDeliveryState @default(PENDING)
+  attemptCount     Int @default(0)
+  maxAttempts      Int
+  nextAttemptAt    DateTime
+  lastAttemptAt    DateTime?
+  lastHttpStatus   Int?
+  lastErrorSummary String?
+  lastSignatureTimestamp  String?
+  deliveredAt             DateTime?
+  lastAttemptCorrelationId String?
+
+  signingRequest IntegrationSigningRequest @relation(fields: [signingRequestId], references: [id], onDelete: Cascade)
+  event          IntegrationSigningEvent   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([signingRequestId, state], map: "IntegrationCallbackDelivery_requestId_state_idx")
+  @@index([state, nextAttemptAt], map: "IntegrationCallbackDelivery_state_nextAttemptAt_idx")
 }
 
 enum FieldType {
