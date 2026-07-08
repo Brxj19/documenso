@@ -6,15 +6,19 @@ import { initContract } from '@ts-rest/core';
 
 import {
   INTEGRATION_API_V1_CAPABILITIES_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUEST_ARTIFACTS_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUEST_EVIDENCE_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUEST_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUEST_SEND_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUESTS_ROUTE,
   INTEGRATION_API_V1_SIGNING_SESSION_ROUTE,
 } from './integration/route';
 import {
+  ZIntegrationApiV1ArtifactListResponseSchema,
   ZIntegrationApiV1CreateSigningRequestResponseSchema,
   ZIntegrationApiV1CreateSigningSessionResponseSchema,
   ZIntegrationApiV1CreateSigningSessionSchema,
+  ZIntegrationApiV1EvidenceResponseSchema,
   ZIntegrationApiV1HealthResponseSchema,
   ZIntegrationApiV1SigningRequestResponseSchema,
   ZIntegrationApiV1SigningRequestSchema,
@@ -104,6 +108,34 @@ export const ApiContractV1 = c.router(
       summary: 'Get the normalized status for a signing request',
       description:
         'Returns the normalized request status, source-document verification details, staged participant mapping, and safe native-document references for a previously created signing request.',
+    },
+
+    getIntegrationSigningRequestEvidence: {
+      method: 'GET',
+      path: INTEGRATION_API_V1_SIGNING_REQUEST_EVIDENCE_ROUTE,
+      responses: {
+        200: ZIntegrationApiV1EvidenceResponseSchema,
+        400: ZUnsuccessfulResponseSchema,
+        401: ZUnsuccessfulResponseSchema,
+        404: ZUnsuccessfulResponseSchema,
+      },
+      summary: 'Get normalized evidence for a signing request',
+      description:
+        'Returns append-only normalized events, participant timeline, callback delivery state, and final artifact evidence for a reusable integration signing request.',
+    },
+
+    getIntegrationSigningRequestArtifacts: {
+      method: 'GET',
+      path: INTEGRATION_API_V1_SIGNING_REQUEST_ARTIFACTS_ROUTE,
+      responses: {
+        200: ZIntegrationApiV1ArtifactListResponseSchema,
+        400: ZUnsuccessfulResponseSchema,
+        401: ZUnsuccessfulResponseSchema,
+        404: ZUnsuccessfulResponseSchema,
+      },
+      summary: 'Get completed artifact metadata for a signing request',
+      description:
+        'Returns safe metadata for completed signed artifacts captured from Documenso-native storage without exposing raw storage keys or public URLs.',
     },
 
     sendIntegrationSigningRequest: {

@@ -118,20 +118,55 @@ GET /api/v1/integration/capabilities
 When the flag is absent or set to anything other than `"true"`, the endpoint
 returns a not-found style response and exposes no capabilities.
 
-## Enable Phase 4 Signing Sessions Locally
+## Enable Phase 5 Evidence And Callbacks Locally
 
-Phase 4 keeps the facade behind the same feature flag and adds a safe return URL
-allowlist for redirect-mode signing sessions.
+Phase 5 keeps the facade behind the same feature flag and adds:
+
+- redirect return URL allowlisting
+- callback URL allowlisting
+- callback signing
+- reconciliation and callback-processing commands
 
 Add this to `.env` for local verification:
 
 ```text
 INTEGRATION_API_V1_ENABLED="true"
 INTEGRATION_API_V1_RETURN_URL_ALLOWLIST="http://localhost:3000,http://127.0.0.1:3000"
+INTEGRATION_API_V1_CALLBACK_URL_ALLOWLIST="http://localhost:3000,http://127.0.0.1:3000"
+INTEGRATION_API_V1_CALLBACK_SIGNING_SECRET="local-only-integration-secret"
+INTEGRATION_API_V1_CALLBACK_TIMEOUT_MS="10000"
+INTEGRATION_API_V1_CALLBACK_MAX_ATTEMPTS="5"
+INTEGRATION_API_V1_CALLBACK_RETRY_DELAY_MS="1000"
 ```
 
 That allows local consumers to request redirect sessions and return safely to a
-same-machine callback page after signing completes.
+same-machine callback page after signing completes while also allowing local
+callback targets for Phase 5 outbox delivery.
+
+## Reconciliation And Callback Processing
+
+Rebuild normalized Phase 5 evidence from native Documenso state:
+
+```bash
+npm run integration:reconcile
+```
+
+Dry-run the same reconciliation without mutating state:
+
+```bash
+npm run integration:reconcile -- --dry-run
+```
+
+Process due callback deliveries from the Phase 5 outbox:
+
+```bash
+npm run integration:callbacks
+```
+
+The local app still uses the existing background-job system. When the app is
+running with the local job provider, that remains the supported runtime for
+native Documenso jobs. The new callback command is the safest way to
+demonstrate retry behavior on demand.
 
 ## Baseline Signing Verification
 
@@ -164,6 +199,16 @@ signing flow, complete signing, and save any downloaded signed artifacts under:
 
 ```text
 .local/reusable-signing-tool/signed-artifacts/
+```
+
+## Integrity Verification
+
+Phase 5 adds a focused integrity test around captured signed-PDF SHA-256
+evidence. Run it alongside the integration evidence tests:
+
+```bash
+npm run with:env -- \
+  npx vitest run packages/api/v1/integration/evidence.test.ts
 ```
 
 ## Cleanup

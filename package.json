@@ -32,6 +32,8 @@
     "prisma:migrate-reset": "npm run with:env -- npm run prisma:migrate-reset -w @documenso/prisma",
     "prisma:seed": "npm run with:env -- npm run prisma:seed -w @documenso/prisma",
     "prisma:studio": "npm run with:env -- npm run prisma:studio -w @documenso/prisma",
+    "integration:reconcile": "npm run with:env -- tsx scripts/integration-reconcile.ts",
+    "integration:callbacks": "npm run with:env -- tsx scripts/process-integration-callbacks.ts",
     "with:env": "dotenv -e .env -e .env.local --",
     "reset:hard": "npm run clean && npm i && npm run prisma:generate",
     "precommit": "npm install && git add package.json package-lock.json",

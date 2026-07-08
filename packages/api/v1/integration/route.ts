@@ -11,6 +11,12 @@ export const INTEGRATION_API_V1_CAPABILITIES_ROUTE = '/api/v1/integration/capabi
 export const INTEGRATION_API_V1_SIGNING_REQUESTS_ROUTE = '/api/v1/integration/signing-requests';
 export const INTEGRATION_API_V1_SIGNING_REQUEST_ROUTE = '/api/v1/integration/signing-requests/:requestId';
 export const INTEGRATION_API_V1_SIGNING_REQUEST_SEND_ROUTE = '/api/v1/integration/signing-requests/:requestId/send';
+export const INTEGRATION_API_V1_SIGNING_REQUEST_EVIDENCE_ROUTE =
+  '/api/v1/integration/signing-requests/:requestId/evidence';
+export const INTEGRATION_API_V1_SIGNING_REQUEST_ARTIFACTS_ROUTE =
+  '/api/v1/integration/signing-requests/:requestId/artifacts';
+export const INTEGRATION_API_V1_SIGNING_REQUEST_ARTIFACT_DOWNLOAD_ROUTE =
+  '/api/v1/integration/signing-requests/:requestId/artifacts/:artifactId/download';
 export const INTEGRATION_API_V1_SIGNING_SESSION_ROUTE =
   '/api/v1/integration/signing-requests/:requestId/participants/:participantId/signing-session';
 
@@ -26,13 +32,21 @@ export const getIntegrationApiV1Capabilities = (): TIntegrationApiV1CapabilitySc
     embeddedSigningSupported: false,
     sessionExpirySupported: true,
     returnUrlAllowlistSupported: true,
-    callbackEventsSupported: false,
+    callbackEventsSupported: true,
+    evidenceEndpointSupported: true,
+    finalArtifactMetadataSupported: true,
+    finalArtifactDownloadSupported: true,
+    callbackSigningSupported: true,
+    callbackRetryOutboxSupported: true,
+    reconciliationSupported: true,
+    integrityVerificationTested: true,
+    supportedCallbackModes: ['PER_REQUEST_URL'],
     supportedDocumentCount: {
       minimum: 1,
       maximum: 1,
       multipleDocuments: false,
     },
-    releasePhase: 'PHASE_4_SIGNING_SESSIONS',
+    releasePhase: 'PHASE_5_AUDIT_EVIDENCE_CALLBACKS',
   });
 
 export const getIntegrationApiV1HealthResponse = (): TIntegrationApiV1HealthResponseSchema =>

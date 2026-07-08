@@ -1,247 +1,284 @@
 # Integration API V1 Signing Requests
 
-Phase 4 extends the reusable signing-tool facade under
-`INTEGRATION_API_V1_ENABLED` with recipient-scoped signing sessions that launch
-the existing Documenso signer through a thin redirect wrapper.
+Phase 5 keeps the reusable signing-tool facade behind
+`INTEGRATION_API_V1_ENABLED` and makes completed requests defensible after
+signing by adding normalized evidence, final-artifact capture, protected
+artifact retrieval, signed callbacks, and reconciliation commands.
 
 ## Endpoints
 
 - `GET /api/v1/integration/capabilities`
 - `POST /api/v1/integration/signing-requests`
-- `POST /api/v1/integration/signing-requests/:requestId/send`
 - `GET /api/v1/integration/signing-requests/:requestId`
+- `POST /api/v1/integration/signing-requests/:requestId/send`
 - `POST /api/v1/integration/signing-requests/:requestId/participants/:participantId/signing-session`
+- `GET /api/v1/integration/signing-requests/:requestId/evidence`
+- `GET /api/v1/integration/signing-requests/:requestId/artifacts`
+- `GET /api/v1/integration/signing-requests/:requestId/artifacts/:artifactId/download`
 - `GET /sign/integration/:sessionId`
 - `GET /sign/integration/:sessionId/complete`
 - `GET /t/:teamUrl/integration/signing-requests/:requestId`
 
-## Chosen Launch Model
+## Normalized Evidence
 
-Phase 4 does not build a new signer UI.
+Phase 5 adds append-only integration events keyed to the signing request and
+deduped by a server-generated normalization key. Current event types include:
 
-Instead it uses:
+- `REQUEST_CREATED`
+- `REQUEST_SENT`
+- `SIGNING_SESSION_CREATED`
+- `SIGNING_SESSION_LAUNCHED`
+- `PARTICIPANT_COMPLETED`
+- `PARTICIPANT_REJECTED`
+- `REQUEST_PARTIALLY_COMPLETED`
+- `REQUEST_COMPLETED`
+- `REQUEST_REJECTED`
+- `REQUEST_FAILED`
+- `FINAL_ARTIFACT_CAPTURED`
+- `CALLBACK_QUEUED`
+- `CALLBACK_DELIVERED`
+- `CALLBACK_FAILED`
+- `RECONCILIATION_REFRESHED`
 
-- an integration-owned signing session row
-- a public launch wrapper URL
-- the existing native recipient route at `/sign/:token`
-- a public completion wrapper URL
+Each event stores only safe references:
 
-The API never returns a raw native recipient token. The caller receives a
-launch URL like `/sign/integration/:sessionId`, and the wrapper validates:
+- request ID and request correlation ID
+- event correlation ID
+- optional participant/session references
+- optional native envelope and recipient references
+- optional native audit-log reference when one is available
+- status before and after
+- event timestamp and observed timestamp
+- safe metadata only
 
-- feature-flag availability
-- session expiry
-- participant-to-recipient scope
-- active request eligibility
-- safe completion return behavior
+No event row stores document bytes, private keys, signing tokens, or raw
+callback secrets.
 
-After that validation, the wrapper redirects to the existing Documenso signer.
+## Correlation IDs
 
-## Signing Session Endpoint
+Phase 5 generates correlation IDs server-side for:
 
-`POST /api/v1/integration/signing-requests/:requestId/participants/:participantId/signing-session`
+- the integration signing request
+- each normalized event
+- each callback delivery attempt
 
-Request body:
+The request also accepts an optional caller-provided `clientCorrelationId`. The
+server-generated request correlation ID is the value returned in API responses,
+used in reconciliation, and included in callback payloads and signature input.
 
-- `mode`
-  - `REDIRECT` is supported
-  - `EMBED` is rejected in Phase 4
-- optional `returnUrl`
-- optional `clientState`
-- optional `ttlSeconds`
+## Final Artifact Capture
 
-Response fields:
+When a request reaches `COMPLETED`, Phase 5 captures one durable final artifact
+record for the completed native PDF:
 
-- `sessionId`
+- artifact type `SIGNED_PDF`
+- filename
+- MIME type
+- size in bytes
+- native envelope and envelope-item references
+- storage-backed `DocumentData` reference
+- server-computed SHA-256 hash of the actual signed PDF bytes
+- capture timestamp
+- safe certificate/evidence metadata
+
+Artifact capture is idempotent. Re-running reconciliation or seeing duplicate
+completion signals will not create a second artifact row.
+
+## Certificate And Evidence Metadata
+
+Phase 5 reuses existing Documenso certificate and audit-log behavior without
+trying to rebuild the signing engine.
+
+The evidence response exposes only safe metadata:
+
+- whether certificate PDF download is available
+- whether audit-log PDF download is available
+- signing timestamp when available
+- verification status derived from the captured artifact hash
+
+The current Community Edition flow does not expose certificate subject, issuer,
+serial number, or private cryptographic material through the integration layer,
+so those fields remain absent rather than fabricated.
+
+## Evidence Endpoint
+
+`GET /api/v1/integration/signing-requests/:requestId/evidence`
+
+Returns:
+
+- request ID
+- server-generated correlation ID
+- optional client correlation ID
+- normalized request status
+- participant timeline
+- normalized event timeline
+- final artifact metadata when available
+- final SHA-256 when available
+- safe certificate/evidence metadata when available
+- callback delivery state
+- reconciliation timestamps
+- created, updated, completed, and rejected timestamps
+
+## Artifact Metadata Endpoint
+
+`GET /api/v1/integration/signing-requests/:requestId/artifacts`
+
+Returns safe metadata only for captured final artifacts. The endpoint rejects
+requests that are not yet completed.
+
+## Protected Artifact Download
+
+`GET /api/v1/integration/signing-requests/:requestId/artifacts/:artifactId/download`
+
+This route is authenticated with the existing V1 API token pattern and streams
+the completed signed PDF through the server. It does not expose raw storage
+keys, public object-store URLs, or download access for non-completed requests.
+
+## Callback Configuration
+
+Phase 5 keeps callback configuration neutral and per request:
+
+- request body `callback.url`
+- optional request body `callback.correlationId`
+- optional request body `callback.metadata`
+
+New environment variables:
+
+- `INTEGRATION_API_V1_CALLBACK_URL_ALLOWLIST`
+- `INTEGRATION_API_V1_CALLBACK_SIGNING_SECRET`
+- `INTEGRATION_API_V1_CALLBACK_TIMEOUT_MS`
+- `INTEGRATION_API_V1_CALLBACK_MAX_ATTEMPTS`
+- `INTEGRATION_API_V1_CALLBACK_RETRY_DELAY_MS`
+
+Callback URLs must be absolute `http` or `https` URLs and must match the
+allowlist. Non-HTTP schemes, malformed URLs, and non-allowlisted targets are
+rejected.
+
+## Callback Payload And Headers
+
+Callbacks are sent with a generic JSON payload that includes:
+
+- `eventId`
+- `eventType`
 - `requestId`
-- `participantId`
-- `mode`
-- `expiresAt`
-- `launchUrl`
-- accepted `returnUrl`
-- echoed `clientState`
-- normalized `participantStatus`
-- normalized `requestStatus`
-- `embeddedSupported`
+- `requestCorrelationId`
+- `eventTimestamp`
+- `requestStatus` when available
+- `participantId` when applicable
+- artifact metadata when applicable
+- final SHA-256 when applicable
+- optional client correlation state when available
+- `deliveryAttempt`
 
-## Redirect Flow
+Headers:
 
-The supported Phase 4 consumer flow is:
+- `X-Integration-Event-Id`
+- `X-Integration-Timestamp`
+- `X-Integration-Signature`
+- `X-Integration-Delivery-Id`
 
-1. Create a signing request.
-2. Activate it with `send`.
-3. Create a participant-specific signing session.
-4. Redirect the browser to the returned `launchUrl`.
-5. The wrapper validates the session and redirects into the native signer.
-6. The signer completes in the existing Documenso signing screen.
-7. Completion returns through `/sign/integration/:sessionId/complete`.
-8. The completion wrapper redirects to the accepted safe `returnUrl`, or falls
-   back to the native completion page when no `returnUrl` was stored.
+The signature is HMAC SHA-256 over:
 
-The completion redirect appends only minimal safe query params:
+```text
+<timestamp>.<raw-json-body>
+```
 
-- `requestId`
-- `participantId`
-- `status`
-- `clientState` when provided
+using `INTEGRATION_API_V1_CALLBACK_SIGNING_SECRET`.
 
-## Eligibility Rules
+## Callback Retry And Outbox Behavior
 
-Phase 4 session creation rejects requests when:
+Phase 5 persists one callback-delivery row per normalized event and request.
 
-- the feature flag is disabled
-- the request is unknown or outside the caller team scope
-- the participant is unknown or outside the request
-- the request has not been activated
-- the request is already terminal
-- the participant is blocked by an earlier stage
-- the participant is already completed, rejected, cancelled, expired, or failed
-- the participant lacks a native actionable recipient mapping
-- the `returnUrl` is unsafe or not allowlisted
-- the requested mode is unsupported
+Each delivery row tracks:
 
-Unknown or inaccessible request and participant combinations are returned as
-not-found style responses to avoid leaking scope.
+- target URL
+- payload template
+- payload hash
+- attempt count
+- max attempts
+- next attempt time
+- last attempt time
+- last HTTP status
+- last safe error summary
+- delivery state
+- last delivery-attempt correlation ID
 
-## Session Expiry
+Delivery states:
 
-Phase 4 adds persisted integration signing sessions with:
+- `PENDING`
+- `DELIVERING`
+- `DELIVERED`
+- `FAILED_RETRYABLE`
+- `FAILED_FINAL`
 
-- `sessionId`
-- request reference
-- participant reference
-- native recipient reference
-- mode
-- optional `returnUrl`
-- optional `clientState`
-- `expiresAt`
-- `launchedAt`
-- `completedAt`
+Rules:
 
-Behavior:
+- duplicate normalized events do not enqueue duplicate callbacks
+- callback delivery failures do not block signing completion
+- retry history is visible through the evidence endpoint
+- callback status changes append new normalized events instead of mutating the
+  original business event body
 
-- default TTL is 15 minutes
-- maximum TTL is 60 minutes
-- expired sessions cannot launch
-- expired sessions are also blocked at completion-time mutation validation
-- raw document bytes and recipient secrets are not stored in the session row
+## Reconciliation Command
 
-Because the native recipient token model remains the underlying signer transport,
-Phase 4 enforces expiry at the integration wrapper layer instead of replacing
-the existing token format.
+Phase 5 adds:
 
-## Return URL Allowlist
+```bash
+npm run integration:reconcile
+```
 
-Phase 4 adds:
+Optional dry-run:
 
-- `INTEGRATION_API_V1_RETURN_URL_ALLOWLIST`
+```bash
+npm run integration:reconcile -- --dry-run
+```
 
-This is a comma-separated allowlist of absolute `http` or `https` values.
+The command scans active or recently touched integration requests, derives the
+normalized state from native Documenso data, captures missing final artifacts,
+appends missing normalized events idempotently, and queues missing callbacks
+idempotently.
 
-Supported patterns:
+Due callback deliveries can be processed with:
 
-- exact origins such as `http://localhost:3000`
-- exact URLs such as `http://localhost:3000/integration/return`
+```bash
+npm run integration:callbacks
+```
 
-Rejected values include:
+## Integrity Verification
 
-- non-absolute URLs
-- malformed URLs
-- non-HTTP schemes
-- `javascript:` or `data:` URLs
-- protocol-relative URLs
-- unknown origins or URLs
+The integration layer does not implement a separate PDF cryptography engine.
+Instead it captures the final signed bytes from native Documenso storage and
+stores the final SHA-256 hash for evidence and tamper detection.
 
-An empty allowlist means caller-supplied `returnUrl` values are rejected.
+Phase 5 verification uses that captured hash as the integrity baseline:
 
-## Embedded Signing Status
-
-Phase 4 does not expose embedded signing for the integration facade.
-
-Capabilities report:
-
-- redirect signing supported: `true`
-- embedded signing supported: `false`
-- supported signing modes: `['REDIRECT']`
-
-This keeps the Phase 4 surface aligned with the safest Community Edition path:
-redirect into the existing signer.
-
-## Participant Identity and Scope
-
-Each integration signing session maps:
-
-- one integration request
-- one integration participant
-- one native Documenso recipient
-
-The wrapper only launches the native signer for that recipient token, and the
-completion mutation validates the optional `integrationSessionId` against the
-recipient token before the document can be completed.
-
-This preserves the native recipient-token model while preventing a session from
-being used to complete a different participant.
-
-## Native Signer Behavior
-
-Phase 4 continues to reuse the existing signer for:
-
-- PDF rendering
-- required-field handling
-- sign intent
-- recipient access auth
-- recipient status transitions
-- document completion
-- certificate-backed finalization
-
-No Phase 4 field-placement system was added. Integration-created requests can
-still complete without fields when the native signer permits it.
+- the downloaded completed PDF must match the stored SHA-256
+- a tampered copy must fail the same hash comparison
 
 ## Capabilities
 
 `GET /api/v1/integration/capabilities` now reports:
 
-- `releasePhase: PHASE_4_SIGNING_SESSIONS`
-- `supportedSigningModes: ['REDIRECT']`
-- `redirectSigningSupported: true`
-- `embeddedSigningSupported: false`
-- `sessionExpirySupported: true`
-- `returnUrlAllowlistSupported: true`
-- `callbackEventsSupported: false`
+- `releasePhase: PHASE_5_AUDIT_EVIDENCE_CALLBACKS`
+- `callbackEventsSupported: true`
+- `evidenceEndpointSupported: true`
+- `finalArtifactMetadataSupported: true`
+- `finalArtifactDownloadSupported: true`
+- `callbackSigningSupported: true`
+- `callbackRetryOutboxSupported: true`
+- `reconciliationSupported: true`
+- `integrityVerificationTested: true`
+- `supportedCallbackModes: ['PER_REQUEST_URL']`
 
-Phase 4 does not add a new callback delivery framework. Consumers should rely
-on the normalized status endpoint and, when configured, the safe completion
-return URL.
+## Out Of Scope
 
-## Minimal Example
+Phase 5 still does not add:
 
-Example backend flow:
-
-1. `POST /api/v1/integration/signing-requests`
-2. `POST /api/v1/integration/signing-requests/:requestId/send`
-3. `POST /api/v1/integration/signing-requests/:requestId/participants/:participantId/signing-session`
-4. Redirect the browser to `launchUrl`
-5. After return, call `GET /api/v1/integration/signing-requests/:requestId`
-
-Example generic references:
-
-- title: `Contract Review`
-- participants: `Signer One`, `Signer Two`
-- external reference: `EXT-EXAMPLE-001`
-
-## Out of Scope
-
-Phase 4 still does not add:
-
-- provider abstraction beyond Documenso
-- embedded signing SDK behavior
-- arbitrary open redirects
-- document-owner signing URLs
-- reminder workflows
-- bulk signing
-- external provider integrations
-- a new callback delivery framework
-- domain-specific UI or vocabulary
-
-The internal team request-details page remains read-only. The documentation is
-the supported example surface for launching sessions in this phase.
+- a custom signing engine
+- embedded signing
+- public artifact URLs
+- private key exposure
+- manual audit editing
+- multi-document package support
+- external SaaS signing providers
+- domain-specific or customer-specific vocabulary

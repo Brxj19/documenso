@@ -7,13 +7,14 @@ import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import { prefixedId } from '@documenso/lib/universal/id';
 import { prisma } from '@documenso/prisma';
 import { DocumentStatus, type IntegrationSigningSessionMode } from '@prisma/client';
-
+import { reconcileIntegrationApiV1SigningRequest } from './evidence';
 import type {
   TIntegrationApiV1CreateSigningSessionResponseSchema,
   TIntegrationApiV1CreateSigningSessionSchema,
 } from './schema';
 import { ZIntegrationApiV1CreateSigningSessionResponseSchema } from './schema';
 import { getIntegrationApiV1SigningRequest } from './signing-requests';
+import { validateAbsoluteAllowlistedUrl } from './url-allowlist';
 
 const DEFAULT_SIGNING_SESSION_TTL_SECONDS = 15 * 60;
 const MAX_SIGNING_SESSION_TTL_SECONDS = 60 * 60;
@@ -30,16 +31,6 @@ type IntegrationSigningSessionAccessOptions = {
   token?: string;
   allowCompletedParticipant?: boolean;
 };
-
-type AllowlistEntry =
-  | {
-      type: 'origin';
-      origin: string;
-    }
-  | {
-      type: 'url';
-      url: string;
-    };
 
 const buildAbsoluteUrl = (pathname: string) => new URL(pathname, NEXT_PUBLIC_WEBAPP_URL()).toString();
 
@@ -66,73 +57,13 @@ const assertSupportedSigningSessionMode = (mode: TIntegrationApiV1CreateSigningS
   return mode ?? 'REDIRECT';
 };
 
-const parseAbsoluteHttpUrl = (value: string) => {
-  let url: URL;
-
-  try {
-    url = new URL(value);
-  } catch {
-    throw new AppError(AppErrorCode.INVALID_BODY, {
-      message: 'returnUrl must be a valid absolute http or https URL.',
-    });
-  }
-
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new AppError(AppErrorCode.INVALID_BODY, {
-      message: 'returnUrl must use http or https.',
-    });
-  }
-
-  return url;
-};
-
-const parseAllowlistEntry = (value: string): AllowlistEntry => {
-  const url = parseAbsoluteHttpUrl(value);
-
-  if (!url.username && !url.password && url.pathname === '/' && !url.search && !url.hash) {
-    return {
-      type: 'origin',
-      origin: url.origin,
-    };
-  }
-
-  return {
-    type: 'url',
-    url: url.toString(),
-  };
-};
-
 export const validateIntegrationApiV1ReturnUrl = (value?: string) => {
-  if (!value) {
-    return undefined;
-  }
-
-  const allowlist = INTEGRATION_API_V1_RETURN_URL_ALLOWLIST().map(parseAllowlistEntry);
-
-  if (allowlist.length === 0) {
-    throw new AppError(AppErrorCode.INVALID_BODY, {
-      message: 'returnUrl is not configured for this environment.',
-    });
-  }
-
-  const returnUrl = parseAbsoluteHttpUrl(value);
-  const normalizedReturnUrl = returnUrl.toString();
-
-  const isAllowed = allowlist.some((entry) => {
-    if (entry.type === 'origin') {
-      return entry.origin === returnUrl.origin;
-    }
-
-    return entry.url === normalizedReturnUrl;
+  return validateAbsoluteAllowlistedUrl({
+    value,
+    allowlistValues: INTEGRATION_API_V1_RETURN_URL_ALLOWLIST(),
+    label: 'returnUrl',
+    allowlistErrorMessage: 'returnUrl is not allowlisted for integration signing sessions.',
   });
-
-  if (!isAllowed) {
-    throw new AppError(AppErrorCode.INVALID_BODY, {
-      message: 'returnUrl is not allowlisted for integration signing sessions.',
-    });
-  }
-
-  return normalizedReturnUrl;
 };
 
 const buildSafeCompletionReturnUrl = ({
@@ -420,6 +351,12 @@ export const getIntegrationSigningSessionCompletionRedirectUrl = async ({ sessio
     data: {
       completedAt: session.completedAt ?? new Date(),
     },
+  });
+
+  await reconcileIntegrationApiV1SigningRequest({
+    requestId: session.signingRequestId,
+    teamId: session.signingRequest.teamId,
+    source: 'SIGNING_SESSION',
   });
 
   if (session.returnUrl) {

@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ZIntegrationApiV1ArtifactListResponseSchema,
+  ZIntegrationApiV1CallbackDeliverySchema,
   ZIntegrationApiV1CapabilitySchema,
   ZIntegrationApiV1CreateSigningRequestResponseSchema,
   ZIntegrationApiV1CreateSigningSessionResponseSchema,
   ZIntegrationApiV1CreateSigningSessionSchema,
   ZIntegrationApiV1EventSchema,
+  ZIntegrationApiV1EvidenceResponseSchema,
   ZIntegrationApiV1SigningRequestResponseSchema,
   ZIntegrationApiV1SigningRequestSchema,
   ZIntegrationApiV1SigningSessionModeSchema,
@@ -67,13 +70,15 @@ describe('integration api v1 schemas', () => {
 
     const eventResult = ZIntegrationApiV1EventSchema.safeParse({
       eventId: 'event-1',
-      integrationRequestId: 'request-123',
-      externalReference: 'request-123',
-      eventType: 'STATUS_CHANGED',
-      occurredAt: new Date().toISOString(),
+      requestId: 'request-123',
+      eventType: 'REQUEST_SENT',
+      source: 'API',
+      correlationId: 'event-correlation-123',
+      requestCorrelationId: 'correlation-123',
+      eventTimestamp: new Date().toISOString(),
+      observedAt: new Date().toISOString(),
       statusBefore: 'READY',
       statusAfter: 'IN_PROGRESS',
-      correlationId: 'correlation-123',
     });
 
     const capabilityResult = ZIntegrationApiV1CapabilitySchema.safeParse({
@@ -87,13 +92,21 @@ describe('integration api v1 schemas', () => {
       embeddedSigningSupported: false,
       sessionExpirySupported: true,
       returnUrlAllowlistSupported: true,
-      callbackEventsSupported: false,
+      callbackEventsSupported: true,
+      evidenceEndpointSupported: true,
+      finalArtifactMetadataSupported: true,
+      finalArtifactDownloadSupported: true,
+      callbackSigningSupported: true,
+      callbackRetryOutboxSupported: true,
+      reconciliationSupported: true,
+      integrityVerificationTested: true,
+      supportedCallbackModes: ['PER_REQUEST_URL'],
       supportedDocumentCount: {
         minimum: 1,
         maximum: 1,
         multipleDocuments: false,
       },
-      releasePhase: 'PHASE_4_SIGNING_SESSIONS',
+      releasePhase: 'PHASE_5_AUDIT_EVIDENCE_CALLBACKS',
     });
 
     const signingSessionRequestResult = ZIntegrationApiV1CreateSigningSessionSchema.safeParse({
@@ -136,6 +149,8 @@ describe('integration api v1 schemas', () => {
         documentId: 123,
         status: 'PENDING',
       },
+      correlationId: 'integration-correlation-123',
+      clientCorrelationId: 'client-correlation-123',
       stages: [
         {
           order: 1,
@@ -177,6 +192,133 @@ describe('integration api v1 schemas', () => {
       updatedAt: new Date().toISOString(),
     });
 
+    const callbackDeliveryResult = ZIntegrationApiV1CallbackDeliverySchema.safeParse({
+      deliveryId: 'integration_delivery_123',
+      eventId: 'event-1',
+      deliveryState: 'FAILED_RETRYABLE',
+      targetUrl: 'http://localhost:3000/callback',
+      payloadHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      attemptCount: 1,
+      maxAttempts: 5,
+      nextAttemptAt: new Date().toISOString(),
+      lastAttemptAt: new Date().toISOString(),
+      lastHttpStatus: 500,
+      lastErrorSummary: 'Callback returned HTTP 500.',
+      lastAttemptCorrelationId: 'integration_delivery_attempt_123',
+    });
+
+    const evidenceResponseResult = ZIntegrationApiV1EvidenceResponseSchema.safeParse({
+      requestId: 'integration_request_123',
+      correlationId: 'integration-correlation-123',
+      clientCorrelationId: 'client-correlation-123',
+      status: 'COMPLETED',
+      timeline: [],
+      events: [
+        {
+          eventId: 'event-1',
+          requestId: 'integration_request_123',
+          eventType: 'REQUEST_COMPLETED',
+          source: 'ENGINE_COMPLETION',
+          correlationId: 'event-correlation-123',
+          requestCorrelationId: 'integration-correlation-123',
+          eventTimestamp: new Date().toISOString(),
+          observedAt: new Date().toISOString(),
+          statusAfter: 'COMPLETED',
+        },
+      ],
+      artifacts: [
+        {
+          artifactId: 'integration_artifact_123',
+          requestId: 'integration_request_123',
+          artifactType: 'SIGNED_PDF',
+          filename: 'completed-signed.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 1024,
+          sha256: {
+            algorithm: 'SHA-256',
+            value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          },
+          integrityStatus: 'HASH_VERIFIED',
+          capturedAt: new Date().toISOString(),
+          certificateMetadata: {
+            certificatePdfAvailable: true,
+            auditLogPdfAvailable: true,
+            verificationStatus: 'HASH_VERIFIED',
+          },
+        },
+      ],
+      finalArtifact: {
+        artifactId: 'integration_artifact_123',
+        requestId: 'integration_request_123',
+        artifactType: 'SIGNED_PDF',
+        filename: 'completed-signed.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 1024,
+        sha256: {
+          algorithm: 'SHA-256',
+          value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+        integrityStatus: 'HASH_VERIFIED',
+        capturedAt: new Date().toISOString(),
+        certificateMetadata: {
+          certificatePdfAvailable: true,
+          auditLogPdfAvailable: true,
+          verificationStatus: 'HASH_VERIFIED',
+        },
+      },
+      finalSha256: {
+        algorithm: 'SHA-256',
+        value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      },
+      certificateMetadata: {
+        certificatePdfAvailable: true,
+        auditLogPdfAvailable: true,
+        verificationStatus: 'HASH_VERIFIED',
+      },
+      callbacks: {
+        deliveries: [
+          {
+            deliveryId: 'integration_delivery_123',
+            eventId: 'event-1',
+            deliveryState: 'FAILED_RETRYABLE',
+            targetUrl: 'http://localhost:3000/callback',
+            payloadHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            attemptCount: 1,
+            maxAttempts: 5,
+            nextAttemptAt: new Date().toISOString(),
+          },
+        ],
+      },
+      reconciliation: {
+        lastReconciledAt: new Date().toISOString(),
+        lastEventObservedAt: new Date().toISOString(),
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+    });
+
+    const artifactListResult = ZIntegrationApiV1ArtifactListResponseSchema.safeParse({
+      requestId: 'integration_request_123',
+      status: 'COMPLETED',
+      artifacts: [
+        {
+          artifactId: 'integration_artifact_123',
+          requestId: 'integration_request_123',
+          artifactType: 'SIGNED_PDF',
+          filename: 'completed-signed.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 1024,
+          sha256: {
+            algorithm: 'SHA-256',
+            value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          },
+          integrityStatus: 'HASH_VERIFIED',
+          capturedAt: new Date().toISOString(),
+        },
+      ],
+    });
+
     const createResponseResult = ZIntegrationApiV1CreateSigningRequestResponseSchema.safeParse({
       requestId: 'integration_request_123',
       externalReference: 'request-123',
@@ -209,6 +351,9 @@ describe('integration api v1 schemas', () => {
     expect(signingSessionResponseResult.success).toBe(true);
     expect(responseResult.success).toBe(true);
     expect(createResponseResult.success).toBe(true);
+    expect(callbackDeliveryResult.success).toBe(true);
+    expect(evidenceResponseResult.success).toBe(true);
+    expect(artifactListResult.success).toBe(true);
   });
 
   it('rejects invalid source hashes and unsupported mime types', () => {

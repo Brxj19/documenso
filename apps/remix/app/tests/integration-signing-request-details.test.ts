@@ -5,16 +5,26 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getIntegrationApiV1SigningRequestMock, getSessionMock, getTeamByUrlMock, isIntegrationApiEnabledMock } =
-  vi.hoisted(() => ({
-    getIntegrationApiV1SigningRequestMock: vi.fn(),
-    getSessionMock: vi.fn(),
-    getTeamByUrlMock: vi.fn(),
-    isIntegrationApiEnabledMock: vi.fn(),
-  }));
+const {
+  getIntegrationApiV1SigningRequestMock,
+  getIntegrationApiV1SigningRequestEvidenceMock,
+  getSessionMock,
+  getTeamByUrlMock,
+  isIntegrationApiEnabledMock,
+} = vi.hoisted(() => ({
+  getIntegrationApiV1SigningRequestMock: vi.fn(),
+  getIntegrationApiV1SigningRequestEvidenceMock: vi.fn(),
+  getSessionMock: vi.fn(),
+  getTeamByUrlMock: vi.fn(),
+  isIntegrationApiEnabledMock: vi.fn(),
+}));
 
 vi.mock('@documenso/api/v1/integration/signing-requests', () => ({
   getIntegrationApiV1SigningRequest: getIntegrationApiV1SigningRequestMock,
+}));
+
+vi.mock('@documenso/api/v1/integration/evidence', () => ({
+  getIntegrationApiV1SigningRequestEvidence: getIntegrationApiV1SigningRequestEvidenceMock,
 }));
 
 vi.mock('@documenso/auth/server/lib/utils/get-session', () => ({
@@ -154,6 +164,20 @@ describe('integration signing request details route', () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+    getIntegrationApiV1SigningRequestEvidenceMock.mockResolvedValue({
+      requestId: 'request-1',
+      correlationId: 'integration-correlation-1',
+      status: 'READY',
+      timeline: [],
+      events: [],
+      artifacts: [],
+      callbacks: {
+        deliveries: [],
+      },
+      reconciliation: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
 
     const result = await loadIntegrationSigningRequestPageData({
       request: new Request('http://localhost:3000/t/test-team/integration/signing-requests/request-1'),
@@ -166,6 +190,10 @@ describe('integration signing request details route', () => {
       teamUrl: 'test-team',
     });
     expect(getIntegrationApiV1SigningRequestMock).toHaveBeenCalledWith({
+      requestId: 'request-1',
+      teamId: 7,
+    });
+    expect(getIntegrationApiV1SigningRequestEvidenceMock).toHaveBeenCalledWith({
       requestId: 'request-1',
       teamId: 7,
     });
@@ -293,6 +321,95 @@ describe('integration signing request details route', () => {
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
               },
+              evidence: {
+                requestId: 'request-1',
+                correlationId: 'integration-correlation-1',
+                status: 'PARTIALLY_COMPLETED',
+                timeline: [],
+                events: [
+                  {
+                    eventId: 'event-1',
+                    requestId: 'request-1',
+                    eventType: 'REQUEST_PARTIALLY_COMPLETED',
+                    source: 'SYSTEM',
+                    correlationId: 'event-correlation-1',
+                    requestCorrelationId: 'integration-correlation-1',
+                    eventTimestamp: new Date().toISOString(),
+                    observedAt: new Date().toISOString(),
+                    statusAfter: 'PARTIALLY_COMPLETED',
+                  },
+                ],
+                artifacts: [
+                  {
+                    artifactId: 'artifact-1',
+                    requestId: 'request-1',
+                    artifactType: 'SIGNED_PDF',
+                    filename: 'completed-signed.pdf',
+                    mimeType: 'application/pdf',
+                    sizeBytes: 2048,
+                    sha256: {
+                      algorithm: 'SHA-256',
+                      value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                    },
+                    integrityStatus: 'HASH_VERIFIED',
+                    capturedAt: new Date().toISOString(),
+                    certificateMetadata: {
+                      certificatePdfAvailable: true,
+                      auditLogPdfAvailable: true,
+                      verificationStatus: 'HASH_VERIFIED',
+                    },
+                  },
+                ],
+                finalArtifact: {
+                  artifactId: 'artifact-1',
+                  requestId: 'request-1',
+                  artifactType: 'SIGNED_PDF',
+                  filename: 'completed-signed.pdf',
+                  mimeType: 'application/pdf',
+                  sizeBytes: 2048,
+                  sha256: {
+                    algorithm: 'SHA-256',
+                    value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                  },
+                  integrityStatus: 'HASH_VERIFIED',
+                  capturedAt: new Date().toISOString(),
+                  certificateMetadata: {
+                    certificatePdfAvailable: true,
+                    auditLogPdfAvailable: true,
+                    verificationStatus: 'HASH_VERIFIED',
+                  },
+                },
+                finalSha256: {
+                  algorithm: 'SHA-256',
+                  value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                },
+                certificateMetadata: {
+                  certificatePdfAvailable: true,
+                  auditLogPdfAvailable: true,
+                  verificationStatus: 'HASH_VERIFIED',
+                },
+                callbacks: {
+                  deliveries: [
+                    {
+                      deliveryId: 'delivery-1',
+                      eventId: 'event-1',
+                      deliveryState: 'FAILED_RETRYABLE',
+                      targetUrl: 'http://localhost:3000/callback',
+                      payloadHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                      attemptCount: 1,
+                      maxAttempts: 5,
+                      nextAttemptAt: new Date().toISOString(),
+                      lastHttpStatus: 500,
+                      lastErrorSummary: 'Callback returned HTTP 500.',
+                    },
+                  ],
+                },
+                reconciliation: {
+                  lastReconciledAt: new Date().toISOString(),
+                },
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
             },
           } as never),
         ),
@@ -300,6 +417,9 @@ describe('integration signing request details route', () => {
     );
 
     expect(markup).toContain('ALL_REQUIRED');
+    expect(markup).toContain('Final Artifact');
+    expect(markup).toContain('Event Timeline');
+    expect(markup).toContain('Callback Deliveries');
     expect(markup).toContain('Participant Timeline');
     expect(markup).toContain('Previous stage incomplete');
     expect(markup).toContain('Partially Completed');

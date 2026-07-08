@@ -1,5 +1,6 @@
 import { ApiContractV1 } from '@documenso/api/v1/contract';
 import { ApiContractV1Implementation } from '@documenso/api/v1/implementation';
+import { getIntegrationApiV1ArtifactDownloadResponse } from '@documenso/api/v1/integration/artifact-download';
 import { OpenAPIV1 } from '@documenso/api/v1/openapi';
 import { testCredentialsHandler } from '@documenso/lib/server-only/public-api/test-credentials';
 import { listDocumentsHandler } from '@documenso/lib/server-only/webhooks/zapier/list-documents';
@@ -17,6 +18,13 @@ export const tsRestHonoApp = new Hono<HonoEnv>();
 tsRestHonoApp
   .get('/openapi', (c) => c.redirect('https://openapi-v1.documenso.com'))
   .get('/openapi.json', (c) => c.json(OpenAPIV1))
+  .get('/integration/signing-requests/:requestId/artifacts/:artifactId/download', async (c) => {
+    return await getIntegrationApiV1ArtifactDownloadResponse({
+      authorizationHeader: c.req.header('authorization'),
+      requestId: c.req.param('requestId'),
+      artifactId: c.req.param('artifactId'),
+    });
+  })
   .get('/me', async (c) => testCredentialsHandler(c.req.raw));
 
 // Zapier. Todo: (RR7) Check methods. Are these get/post/update requests?
@@ -25,7 +33,7 @@ tsRestHonoApp
   .all('/zapier/subscribe', async (c) => subscribeHandler(c.req.raw))
   .all('/zapier/unsubscribe', async (c) => unsubscribeHandler(c.req.raw));
 
-tsRestHonoApp.mount('/', async (request) => {
+tsRestHonoApp.mount('/', (request) => {
   return fetchRequestHandler({
     request,
     contract: ApiContractV1,
