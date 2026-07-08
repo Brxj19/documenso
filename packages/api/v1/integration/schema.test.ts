@@ -6,6 +6,7 @@ import {
   ZIntegrationApiV1EventSchema,
   ZIntegrationApiV1SigningRequestResponseSchema,
   ZIntegrationApiV1SigningRequestSchema,
+  ZIntegrationApiV1StageCompletionPolicySchema,
   ZIntegrationApiV1StatusSchema,
 } from './schema';
 
@@ -26,9 +27,9 @@ describe('integration api v1 schemas', () => {
       participants: [
         {
           participantId: 'participant-1',
-          email: 'signer.one@example.com',
-          displayName: 'Signer One',
-          role: 'SIGNER',
+          email: 'approver.one@example.com',
+          displayName: 'Approver One',
+          role: 'APPROVER',
         },
         {
           participantId: 'participant-2',
@@ -47,11 +48,8 @@ describe('integration api v1 schemas', () => {
       stages: [
         {
           order: 1,
-          participantIds: ['participant-1'],
-        },
-        {
-          order: 2,
-          participantIds: ['participant-2'],
+          completionPolicy: 'ALL_REQUIRED',
+          participantIds: ['participant-1', 'participant-2'],
         },
       ],
       correlationId: 'correlation-123',
@@ -61,6 +59,7 @@ describe('integration api v1 schemas', () => {
     });
 
     const statusResult = ZIntegrationApiV1StatusSchema.safeParse('COMPLETED');
+    const policyResult = ZIntegrationApiV1StageCompletionPolicySchema.safeParse('ALL_REQUIRED');
 
     const eventResult = ZIntegrationApiV1EventSchema.safeParse({
       eventId: 'event-1',
@@ -84,14 +83,14 @@ describe('integration api v1 schemas', () => {
         maximum: 1,
         multipleDocuments: false,
       },
-      releasePhase: 'PHASE_2_SIGNING_REQUESTS',
+      releasePhase: 'PHASE_3_STAGE_ORCHESTRATION',
     });
 
     const responseResult = ZIntegrationApiV1SigningRequestResponseSchema.safeParse({
       requestId: 'integration_request_123',
       externalReference: 'request-123',
       title: 'Employment Agreement',
-      status: 'READY',
+      status: 'IN_PROGRESS',
       document: {
         sourceReference: 'document_123',
         filename: 'employment-agreement.pdf',
@@ -104,23 +103,43 @@ describe('integration api v1 schemas', () => {
       nativeDocument: {
         envelopeId: 'envelope_123',
         documentId: 123,
-        status: 'DRAFT',
+        status: 'PENDING',
       },
       stages: [
         {
           order: 1,
           nativeSigningOrder: 1,
+          completionPolicy: 'ALL_REQUIRED',
+          status: 'ACTIVE',
+          isActive: true,
+          isBlocked: false,
           participantIds: ['participant-1'],
         },
       ],
       participants: [
         {
           participantId: 'participant-1',
-          email: 'signer.one@example.com',
-          role: 'SIGNER',
-          status: 'NOT_STARTED',
+          email: 'approver.one@example.com',
+          role: 'APPROVER',
+          status: 'AVAILABLE',
           stageOrder: 1,
           nativeSigningOrder: 1,
+          isActionable: true,
+          isBlocked: false,
+        },
+      ],
+      timeline: [
+        {
+          stageOrder: 1,
+          stageStatus: 'ACTIVE',
+          stageCompletionPolicy: 'ALL_REQUIRED',
+          participantId: 'participant-1',
+          email: 'approver.one@example.com',
+          role: 'APPROVER',
+          nativeSigningOrder: 1,
+          status: 'AVAILABLE',
+          isActionable: true,
+          isBlocked: false,
         },
       ],
       createdAt: new Date().toISOString(),
@@ -143,6 +162,7 @@ describe('integration api v1 schemas', () => {
       },
       stages: [],
       participants: [],
+      timeline: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       idempotentReplay: false,
@@ -150,6 +170,7 @@ describe('integration api v1 schemas', () => {
 
     expect(requestResult.success).toBe(true);
     expect(statusResult.success).toBe(true);
+    expect(policyResult.success).toBe(true);
     expect(eventResult.success).toBe(true);
     expect(capabilityResult.success).toBe(true);
     expect(responseResult.success).toBe(true);
@@ -172,8 +193,8 @@ describe('integration api v1 schemas', () => {
       participants: [
         {
           participantId: 'participant-1',
-          email: 'signer.one@example.com',
-          role: 'SIGNER',
+          email: 'approver.one@example.com',
+          role: 'APPROVER',
         },
       ],
       stages: [
@@ -203,12 +224,12 @@ describe('integration api v1 schemas', () => {
       participants: [
         {
           participantId: 'participant-1',
-          email: 'Signer@One.Example.com',
-          role: 'SIGNER',
+          email: 'Approver@One.Example.com',
+          role: 'APPROVER',
         },
         {
           participantId: 'participant-2',
-          email: 'signer@one.example.com',
+          email: 'approver@one.example.com',
           role: 'APPROVER',
         },
       ],
@@ -223,8 +244,8 @@ describe('integration api v1 schemas', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects non-contiguous stages and read-only participants inside stages', () => {
-    const result = ZIntegrationApiV1SigningRequestSchema.safeParse({
+  it('rejects non-contiguous stages, unsupported policies, and read-only participants inside stages', () => {
+    const gapsResult = ZIntegrationApiV1SigningRequestSchema.safeParse({
       externalReference: 'request-123',
       title: 'Employment Agreement',
       document: {
@@ -239,8 +260,8 @@ describe('integration api v1 schemas', () => {
       participants: [
         {
           participantId: 'participant-1',
-          email: 'signer.one@example.com',
-          role: 'SIGNER',
+          email: 'approver.one@example.com',
+          role: 'APPROVER',
         },
         {
           participantId: 'participant-2',
@@ -256,19 +277,44 @@ describe('integration api v1 schemas', () => {
       ],
     });
 
-    expect(result.success).toBe(false);
+    const invalidPolicyResult = ZIntegrationApiV1StageCompletionPolicySchema.safeParse('ANY_ONE');
+
+    expect(gapsResult.success).toBe(false);
+    expect(invalidPolicyResult.success).toBe(false);
   });
 
-  it('rejects invalid status and event values', () => {
-    const statusResult = ZIntegrationApiV1StatusSchema.safeParse('SEALED');
-    const eventResult = ZIntegrationApiV1EventSchema.safeParse({
-      eventId: 'event-1',
-      integrationRequestId: 'request-123',
-      eventType: 'SECRET_DUMP',
-      occurredAt: new Date().toISOString(),
+  it('rejects duplicate participants across stages', () => {
+    const result = ZIntegrationApiV1SigningRequestSchema.safeParse({
+      externalReference: 'request-123',
+      title: 'Employment Agreement',
+      document: {
+        sourceReference: 'document_123',
+        filename: 'employment-agreement.pdf',
+        mimeType: 'application/pdf',
+        contentHash: {
+          algorithm: 'SHA-256',
+          value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+      },
+      participants: [
+        {
+          participantId: 'participant-1',
+          email: 'approver.one@example.com',
+          role: 'APPROVER',
+        },
+      ],
+      stages: [
+        {
+          order: 1,
+          participantIds: ['participant-1'],
+        },
+        {
+          order: 2,
+          participantIds: ['participant-1'],
+        },
+      ],
     });
 
-    expect(statusResult.success).toBe(false);
-    expect(eventResult.success).toBe(false);
+    expect(result.success).toBe(false);
   });
 });

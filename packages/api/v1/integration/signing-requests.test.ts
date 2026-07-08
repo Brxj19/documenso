@@ -1,4 +1,6 @@
 import fs from 'node:fs';
+import { completeDocumentWithToken } from '@documenso/lib/server-only/document/complete-document-with-token';
+import { rejectDocumentWithToken } from '@documenso/lib/server-only/document/reject-document-with-token';
 import { createEnvelope } from '@documenso/lib/server-only/envelope/create-envelope';
 import { sha256 } from '@documenso/lib/universal/crypto';
 import type { ApiRequestMetadata } from '@documenso/lib/universal/extract-request-metadata';
@@ -9,7 +11,11 @@ import { seedUser } from '@documenso/prisma/seed/users';
 import { DocumentDistributionMethod, DocumentStatus, EnvelopeType, SendStatus } from '@prisma/client';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createIntegrationApiV1SigningRequest, getIntegrationApiV1SigningRequest } from './signing-requests';
+import {
+  createIntegrationApiV1SigningRequest,
+  getIntegrationApiV1SigningRequest,
+  sendIntegrationApiV1SigningRequest,
+} from './signing-requests';
 
 const examplePdfBuffer = fs.readFileSync(new URL('../../../../assets/example.pdf', import.meta.url));
 
@@ -34,7 +40,7 @@ const toArrayBuffer = (data: Uint8Array): ArrayBuffer =>
 
 const createSourceEnvelope = async ({ userId, teamId }: { userId: number; teamId: number }) => {
   const { documentData } = await putPdfFileServerSide({
-    name: 'phase-2-source.pdf',
+    name: 'phase-3-source.pdf',
     type: 'application/pdf',
     arrayBuffer: async () => toArrayBuffer(examplePdfBuffer),
   });
@@ -46,10 +52,10 @@ const createSourceEnvelope = async ({ userId, teamId }: { userId: number; teamId
     bypassDefaultRecipients: true,
     data: {
       type: EnvelopeType.DOCUMENT,
-      title: 'Phase 2 Source Document',
+      title: 'Phase 3 Source Document',
       envelopeItems: [
         {
-          title: 'phase-2-source',
+          title: 'phase-3-source',
           documentDataId: documentData.id,
           order: 1,
         },
@@ -62,60 +68,150 @@ const createSourceEnvelope = async ({ userId, teamId }: { userId: number; teamId
   });
 };
 
+const createParticipant = (participantId: string, role: 'APPROVER' | 'VIEWER' = 'APPROVER') => ({
+  participantId,
+  email: `${participantId}@example.com`,
+  displayName: participantId.replace(/-/g, ' '),
+  role,
+});
+
 const createRequestPayload = ({
   sourceReference,
   hash,
-  idempotencyKey = 'phase-2-idempotency-key',
+  participants,
+  stages,
+  idempotencyKey = 'phase-3-idempotency-key',
   title = 'Provider Neutral Request',
 }: {
   sourceReference: string;
   hash: string;
+  participants: Array<ReturnType<typeof createParticipant>>;
+  stages: Array<{ order: number; participantIds: string[]; completionPolicy?: 'ALL_REQUIRED' }>;
   idempotencyKey?: string;
   title?: string;
 }) => ({
-  externalReference: 'phase-2-request-001',
+  externalReference: `${idempotencyKey}-request`,
   title,
   document: {
     sourceReference,
-    filename: 'phase-2-source.pdf',
+    filename: 'phase-3-source.pdf',
     mimeType: 'application/pdf' as const,
     contentHash: {
       algorithm: 'SHA-256',
       value: hash,
     },
   },
-  participants: [
-    {
-      participantId: 'signer-1',
-      email: 'signer.one@example.com',
-      displayName: 'Signer One',
-      role: 'SIGNER' as const,
-    },
-    {
-      participantId: 'approver-1',
-      email: 'approver.one@example.com',
-      displayName: 'Approver One',
-      role: 'APPROVER' as const,
-    },
-    {
-      participantId: 'viewer-1',
-      email: 'viewer.one@example.com',
-      displayName: 'Viewer One',
-      role: 'VIEWER' as const,
-    },
-  ],
-  stages: [
-    {
-      order: 1,
-      participantIds: ['signer-1'],
-    },
-    {
-      order: 2,
-      participantIds: ['approver-1'],
-    },
-  ],
+  participants,
+  stages: stages.map((stage) => ({
+    ...stage,
+    completionPolicy: 'ALL_REQUIRED' as const,
+  })),
   idempotencyKey,
 });
+
+const getSourceHash = async (sourceEnvelope: Awaited<ReturnType<typeof createSourceEnvelope>>) => {
+  const sourceBytes = await getFileServerSide(sourceEnvelope.envelopeItems[0].documentData);
+
+  return Buffer.from(sha256(sourceBytes)).toString('hex');
+};
+
+const createAndActivateSigningRequest = async ({
+  participants,
+  stages,
+  idempotencyKey,
+}: {
+  participants: Array<ReturnType<typeof createParticipant>>;
+  stages: Array<{ order: number; participantIds: string[]; completionPolicy?: 'ALL_REQUIRED' }>;
+  idempotencyKey: string;
+}) => {
+  const { user, team } = await seedUser();
+  createdUserIds.push(user.id);
+
+  const sourceEnvelope = await createSourceEnvelope({
+    userId: user.id,
+    teamId: team.id,
+  });
+  const sourceHash = await getSourceHash(sourceEnvelope);
+
+  const created = await createIntegrationApiV1SigningRequest({
+    request: createRequestPayload({
+      sourceReference: sourceEnvelope.id,
+      hash: sourceHash,
+      participants,
+      stages,
+      idempotencyKey,
+    }),
+    userId: user.id,
+    teamId: team.id,
+    requestMetadata,
+  });
+
+  const activated = await sendIntegrationApiV1SigningRequest({
+    requestId: created.requestId,
+    teamId: team.id,
+    requestMetadata,
+  });
+
+  return {
+    user,
+    team,
+    created,
+    activated,
+  };
+};
+
+const completeParticipant = async ({ requestId, participantId }: { requestId: string; participantId: string }) => {
+  const participant = await prisma.integrationSigningRequestParticipant.findFirstOrThrow({
+    where: {
+      signingRequestId: requestId,
+      participantId,
+    },
+    include: {
+      nativeRecipient: true,
+      signingRequest: true,
+    },
+  });
+
+  if (!participant.nativeRecipient || !participant.signingRequest.envelopeId) {
+    throw new Error(`Missing native recipient for ${participantId}`);
+  }
+
+  await completeDocumentWithToken({
+    token: participant.nativeRecipient.token,
+    id: {
+      type: 'envelopeId',
+      id: participant.signingRequest.envelopeId,
+    },
+    requestMetadata: requestMetadata.requestMetadata,
+  });
+};
+
+const rejectParticipant = async ({ requestId, participantId }: { requestId: string; participantId: string }) => {
+  const participant = await prisma.integrationSigningRequestParticipant.findFirstOrThrow({
+    where: {
+      signingRequestId: requestId,
+      participantId,
+    },
+    include: {
+      nativeRecipient: true,
+      signingRequest: true,
+    },
+  });
+
+  if (!participant.nativeRecipient || !participant.signingRequest.envelopeId) {
+    throw new Error(`Missing native recipient for ${participantId}`);
+  }
+
+  await rejectDocumentWithToken({
+    token: participant.nativeRecipient.token,
+    id: {
+      type: 'envelopeId',
+      id: participant.signingRequest.envelopeId,
+    },
+    reason: 'Rejected in Phase 3 test',
+    requestMetadata: requestMetadata.requestMetadata,
+  });
+};
 
 afterEach(async () => {
   if (createdUserIds.length > 0) {
@@ -138,13 +234,27 @@ describe('integration signing requests', () => {
       userId: user.id,
       teamId: team.id,
     });
-    const sourceBytes = await getFileServerSide(sourceEnvelope.envelopeItems[0].documentData);
-    const sourceHash = Buffer.from(sha256(sourceBytes)).toString('hex');
+    const sourceHash = await getSourceHash(sourceEnvelope);
 
     const response = await createIntegrationApiV1SigningRequest({
       request: createRequestPayload({
         sourceReference: sourceEnvelope.id,
         hash: sourceHash,
+        participants: [
+          createParticipant('approver-1'),
+          createParticipant('approver-2'),
+          createParticipant('viewer-1', 'VIEWER'),
+        ],
+        stages: [
+          {
+            order: 1,
+            participantIds: ['approver-1'],
+          },
+          {
+            order: 2,
+            participantIds: ['approver-2'],
+          },
+        ],
       }),
       userId: user.id,
       teamId: team.id,
@@ -155,17 +265,34 @@ describe('integration signing requests', () => {
     expect(response.status).toBe('READY');
     expect(response.nativeDocument?.status).toBe('DRAFT');
     expect(response.stages).toEqual([
-      {
+      expect.objectContaining({
         order: 1,
         nativeSigningOrder: 1,
-        participantIds: ['signer-1'],
-      },
-      {
+        completionPolicy: 'ALL_REQUIRED',
+        status: 'WAITING',
+        blockedReason: 'REQUEST_NOT_ACTIVE',
+        participantIds: ['approver-1'],
+      }),
+      expect.objectContaining({
         order: 2,
         nativeSigningOrder: 2,
-        participantIds: ['approver-1'],
-      },
+        completionPolicy: 'ALL_REQUIRED',
+        status: 'WAITING',
+        blockedReason: 'REQUEST_NOT_ACTIVE',
+        participantIds: ['approver-2'],
+      }),
     ]);
+    expect(response.timeline).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          participantId: 'approver-1',
+          stageOrder: 1,
+          stageStatus: 'WAITING',
+          stageCompletionPolicy: 'ALL_REQUIRED',
+          status: 'WAITING',
+        }),
+      ]),
+    );
 
     const createdEnvelope = await prisma.envelope.findFirstOrThrow({
       where: {
@@ -190,24 +317,24 @@ describe('integration signing requests', () => {
       userId: user.id,
       teamId: team.id,
     });
-    const sourceBytes = await getFileServerSide(sourceEnvelope.envelopeItems[0].documentData);
-    const sourceHash = Buffer.from(sha256(sourceBytes)).toString('hex');
+    const sourceHash = await getSourceHash(sourceEnvelope);
+
+    const request = {
+      sourceReference: sourceEnvelope.id,
+      hash: sourceHash,
+      participants: [createParticipant('approver-1')],
+      stages: [{ order: 1, participantIds: ['approver-1'] }],
+    };
 
     const firstResponse = await createIntegrationApiV1SigningRequest({
-      request: createRequestPayload({
-        sourceReference: sourceEnvelope.id,
-        hash: sourceHash,
-      }),
+      request: createRequestPayload(request),
       userId: user.id,
       teamId: team.id,
       requestMetadata,
     });
 
     const replayResponse = await createIntegrationApiV1SigningRequest({
-      request: createRequestPayload({
-        sourceReference: sourceEnvelope.id,
-        hash: sourceHash,
-      }),
+      request: createRequestPayload(request),
       userId: user.id,
       teamId: team.id,
       requestMetadata,
@@ -216,8 +343,7 @@ describe('integration signing requests', () => {
     await expect(
       createIntegrationApiV1SigningRequest({
         request: createRequestPayload({
-          sourceReference: sourceEnvelope.id,
-          hash: sourceHash,
+          ...request,
           title: 'Changed Payload Title',
         }),
         userId: user.id,
@@ -246,6 +372,8 @@ describe('integration signing requests', () => {
         request: createRequestPayload({
           sourceReference: sourceEnvelope.id,
           hash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          participants: [createParticipant('approver-1')],
+          stages: [{ order: 1, participantIds: ['approver-1'] }],
         }),
         userId: user.id,
         teamId: team.id,
@@ -264,50 +392,239 @@ describe('integration signing requests', () => {
     expect(createdRequests).toBe(0);
   });
 
-  it('returns the normalized request status view model', async () => {
-    const { user, team } = await seedUser();
-    createdUserIds.push(user.id);
-
-    const sourceEnvelope = await createSourceEnvelope({
-      userId: user.id,
-      teamId: team.id,
+  it('activates sequential requests and unlocks later stages only after prior stages complete', async () => {
+    const { team, activated, created } = await createAndActivateSigningRequest({
+      participants: [createParticipant('approver-1'), createParticipant('approver-2')],
+      stages: [
+        { order: 1, participantIds: ['approver-1'] },
+        { order: 2, participantIds: ['approver-2'] },
+      ],
+      idempotencyKey: 'phase-3-sequential',
     });
-    const sourceBytes = await getFileServerSide(sourceEnvelope.envelopeItems[0].documentData);
-    const sourceHash = Buffer.from(sha256(sourceBytes)).toString('hex');
 
-    const created = await createIntegrationApiV1SigningRequest({
-      request: createRequestPayload({
-        sourceReference: sourceEnvelope.id,
-        hash: sourceHash,
-      }),
-      userId: user.id,
+    expect(activated.status).toBe('IN_PROGRESS');
+    expect(activated.stages).toEqual([
+      expect.objectContaining({ order: 1, status: 'ACTIVE', isActive: true }),
+      expect.objectContaining({ order: 2, status: 'BLOCKED', blockedReason: 'PREVIOUS_STAGE_INCOMPLETE' }),
+    ]);
+    expect(activated.participants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ participantId: 'approver-1', status: 'AVAILABLE', isBlocked: false }),
+        expect.objectContaining({
+          participantId: 'approver-2',
+          status: 'WAITING',
+          isBlocked: true,
+          blockedReason: 'PREVIOUS_STAGE_INCOMPLETE',
+        }),
+      ]),
+    );
+
+    const replayedActivation = await sendIntegrationApiV1SigningRequest({
+      requestId: created.requestId,
       teamId: team.id,
       requestMetadata,
     });
 
-    const response = await getIntegrationApiV1SigningRequest({
+    expect(replayedActivation.status).toBe('IN_PROGRESS');
+
+    await completeParticipant({
+      requestId: created.requestId,
+      participantId: 'approver-1',
+    });
+
+    const afterFirstCompletion = await getIntegrationApiV1SigningRequest({
       requestId: created.requestId,
       teamId: team.id,
     });
 
-    expect(response.status).toBe('READY');
-    expect(response.participants).toEqual(
+    expect(afterFirstCompletion.status).toBe('PARTIALLY_COMPLETED');
+    expect(afterFirstCompletion.stages).toEqual([
+      expect.objectContaining({ order: 1, status: 'COMPLETED' }),
+      expect.objectContaining({ order: 2, status: 'ACTIVE', isActive: true }),
+    ]);
+    expect(afterFirstCompletion.participants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ participantId: 'approver-1', status: 'COMPLETED' }),
+        expect.objectContaining({ participantId: 'approver-2', status: 'AVAILABLE', isBlocked: false }),
+      ]),
+    );
+
+    await completeParticipant({
+      requestId: created.requestId,
+      participantId: 'approver-2',
+    });
+
+    const completed = await getIntegrationApiV1SigningRequest({
+      requestId: created.requestId,
+      teamId: team.id,
+    });
+
+    expect(completed.status).toBe('COMPLETED');
+    expect(completed.stages.every((stage) => stage.status === 'COMPLETED')).toBe(true);
+  });
+
+  it('keeps parallel stage participants available together and reports partial completion', async () => {
+    const { team, created, activated } = await createAndActivateSigningRequest({
+      participants: [createParticipant('approver-1'), createParticipant('approver-2')],
+      stages: [{ order: 1, participantIds: ['approver-1', 'approver-2'] }],
+      idempotencyKey: 'phase-3-parallel',
+    });
+
+    expect(activated.status).toBe('IN_PROGRESS');
+    expect(activated.stages).toEqual([expect.objectContaining({ order: 1, status: 'ACTIVE', isActive: true })]);
+    expect(activated.participants).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          participantId: 'signer-1',
-          status: 'NOT_STARTED',
-          stageOrder: 1,
-        }),
-        expect.objectContaining({
           participantId: 'approver-1',
-          status: 'NOT_STARTED',
-          stageOrder: 2,
+          status: 'AVAILABLE',
+          nativeSigningOrder: 1,
         }),
         expect.objectContaining({
-          participantId: 'viewer-1',
-          status: 'NOT_REQUIRED',
+          participantId: 'approver-2',
+          status: 'AVAILABLE',
+          nativeSigningOrder: 1,
         }),
       ]),
+    );
+
+    await completeParticipant({
+      requestId: created.requestId,
+      participantId: 'approver-1',
+    });
+
+    const partiallyCompleted = await getIntegrationApiV1SigningRequest({
+      requestId: created.requestId,
+      teamId: team.id,
+    });
+
+    expect(partiallyCompleted.status).toBe('PARTIALLY_COMPLETED');
+    expect(partiallyCompleted.stages).toEqual([expect.objectContaining({ order: 1, status: 'PARTIALLY_COMPLETED' })]);
+
+    await completeParticipant({
+      requestId: created.requestId,
+      participantId: 'approver-2',
+    });
+
+    const completed = await getIntegrationApiV1SigningRequest({
+      requestId: created.requestId,
+      teamId: team.id,
+    });
+
+    expect(completed.status).toBe('COMPLETED');
+  });
+
+  it('handles hybrid sequential to parallel to sequential routing', async () => {
+    const { team, created, activated } = await createAndActivateSigningRequest({
+      participants: [
+        createParticipant('approver-1'),
+        createParticipant('approver-2'),
+        createParticipant('approver-3'),
+        createParticipant('approver-4'),
+      ],
+      stages: [
+        { order: 1, participantIds: ['approver-1'] },
+        { order: 2, participantIds: ['approver-2', 'approver-3'] },
+        { order: 3, participantIds: ['approver-4'] },
+      ],
+      idempotencyKey: 'phase-3-hybrid',
+    });
+
+    expect(activated.stages).toEqual([
+      expect.objectContaining({ order: 1, status: 'ACTIVE' }),
+      expect.objectContaining({ order: 2, status: 'BLOCKED', blockedReason: 'PREVIOUS_STAGE_INCOMPLETE' }),
+      expect.objectContaining({ order: 3, status: 'BLOCKED', blockedReason: 'PREVIOUS_STAGE_INCOMPLETE' }),
+    ]);
+
+    await completeParticipant({
+      requestId: created.requestId,
+      participantId: 'approver-1',
+    });
+
+    const afterStageOne = await getIntegrationApiV1SigningRequest({
+      requestId: created.requestId,
+      teamId: team.id,
+    });
+
+    expect(afterStageOne.stages).toEqual([
+      expect.objectContaining({ order: 1, status: 'COMPLETED' }),
+      expect.objectContaining({ order: 2, status: 'ACTIVE' }),
+      expect.objectContaining({ order: 3, status: 'BLOCKED', blockedReason: 'PREVIOUS_STAGE_INCOMPLETE' }),
+    ]);
+
+    await completeParticipant({
+      requestId: created.requestId,
+      participantId: 'approver-2',
+    });
+
+    const afterFirstParallelCompletion = await getIntegrationApiV1SigningRequest({
+      requestId: created.requestId,
+      teamId: team.id,
+    });
+
+    expect(afterFirstParallelCompletion.stages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ order: 2, status: 'PARTIALLY_COMPLETED' }),
+        expect.objectContaining({ order: 3, status: 'BLOCKED', blockedReason: 'PREVIOUS_STAGE_INCOMPLETE' }),
+      ]),
+    );
+
+    await completeParticipant({
+      requestId: created.requestId,
+      participantId: 'approver-3',
+    });
+
+    const afterParallelStage = await getIntegrationApiV1SigningRequest({
+      requestId: created.requestId,
+      teamId: team.id,
+    });
+
+    expect(afterParallelStage.stages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ order: 2, status: 'COMPLETED' }),
+        expect.objectContaining({ order: 3, status: 'ACTIVE' }),
+      ]),
+    );
+
+    await completeParticipant({
+      requestId: created.requestId,
+      participantId: 'approver-4',
+    });
+
+    const completed = await getIntegrationApiV1SigningRequest({
+      requestId: created.requestId,
+      teamId: team.id,
+    });
+
+    expect(completed.status).toBe('COMPLETED');
+  });
+
+  it('maps participant rejection to the normalized rejected status', async () => {
+    const { team, created } = await createAndActivateSigningRequest({
+      participants: [createParticipant('approver-1'), createParticipant('approver-2')],
+      stages: [
+        { order: 1, participantIds: ['approver-1'] },
+        { order: 2, participantIds: ['approver-2'] },
+      ],
+      idempotencyKey: 'phase-3-rejection',
+    });
+
+    await rejectParticipant({
+      requestId: created.requestId,
+      participantId: 'approver-1',
+    });
+
+    const rejected = await getIntegrationApiV1SigningRequest({
+      requestId: created.requestId,
+      teamId: team.id,
+    });
+
+    expect(rejected.status).toBe('REJECTED');
+    expect(rejected.stages).toEqual([
+      expect.objectContaining({ order: 1, status: 'REJECTED' }),
+      expect.objectContaining({ order: 2, status: 'BLOCKED', blockedReason: 'REQUEST_TERMINATED' }),
+    ]);
+    expect(rejected.participants).toEqual(
+      expect.arrayContaining([expect.objectContaining({ participantId: 'approver-1', status: 'REJECTED' })]),
     );
   });
 });

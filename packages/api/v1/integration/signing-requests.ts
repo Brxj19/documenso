@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
+import { sendDocument } from '@documenso/lib/server-only/document/send-document';
 import { createEnvelope } from '@documenso/lib/server-only/envelope/create-envelope';
 import { getEnvelopeById } from '@documenso/lib/server-only/envelope/get-envelope-by-id';
 import { sha256 } from '@documenso/lib/universal/crypto';
@@ -16,15 +17,18 @@ import {
   EnvelopeType,
   IntegrationSigningRequestStatus,
   Prisma,
+  ReadStatus,
   RecipientRole,
   SigningStatus,
 } from '@prisma/client';
 
 import type {
+  TIntegrationApiV1BlockedReasonSchema,
   TIntegrationApiV1CreateSigningRequestResponseSchema,
   TIntegrationApiV1ParticipantStatusSchema,
   TIntegrationApiV1SigningRequestResponseSchema,
   TIntegrationApiV1SigningRequestSchema,
+  TIntegrationApiV1StageStatusSchema,
   TIntegrationApiV1StatusSchema,
 } from './schema';
 
@@ -36,6 +40,12 @@ type GetIntegrationSigningRequestOptions = {
 type CreateIntegrationSigningRequestOptions = {
   request: TIntegrationApiV1SigningRequestSchema;
   userId: number;
+  teamId: number;
+  requestMetadata: ApiRequestMetadata;
+};
+
+type SendIntegrationSigningRequestOptions = {
+  requestId: string;
   teamId: number;
   requestMetadata: ApiRequestMetadata;
 };
@@ -221,16 +231,17 @@ const reserveIntegrationSigningRequest = async ({
   }
 };
 
+const isActionableRole = (role: RecipientRole) => role === RecipientRole.SIGNER || role === RecipientRole.APPROVER;
+
 const getActionableRecipients = (
   recipients: Array<{
     role: RecipientRole;
     signingStatus: SigningStatus;
     signingOrder: number | null;
   }>,
-) =>
-  recipients.filter(
-    (recipient) => recipient.role === RecipientRole.SIGNER || recipient.role === RecipientRole.APPROVER,
-  );
+) => recipients.filter((recipient) => isActionableRole(recipient.role));
+
+const toIsoString = (value?: Date | null) => (value ? value.toISOString() : undefined);
 
 const getNormalizedStatus = ({
   currentStatus,
@@ -247,6 +258,16 @@ const getNormalizedStatus = ({
     signingOrder: number | null;
   }>;
 }): TIntegrationApiV1StatusSchema => {
+  const actionableRecipients = getActionableRecipients(recipients);
+  const completedActionableCount = actionableRecipients.filter(
+    (recipient) => recipient.signingStatus === SigningStatus.SIGNED,
+  ).length;
+  const hasRejectedActionableRecipient = actionableRecipients.some(
+    (recipient) => recipient.signingStatus === SigningStatus.REJECTED,
+  );
+  const allActionableRecipientsCompleted =
+    actionableRecipients.length > 0 && completedActionableCount === actionableRecipients.length;
+
   if (currentStatus === IntegrationSigningRequestStatus.FAILED) {
     return 'FAILED';
   }
@@ -255,8 +276,12 @@ const getNormalizedStatus = ({
     return 'CANCELLED';
   }
 
-  if (envelopeStatus === DocumentStatus.REJECTED) {
+  if (envelopeStatus === DocumentStatus.REJECTED || hasRejectedActionableRecipient) {
     return 'REJECTED';
+  }
+
+  if (allActionableRecipientsCompleted) {
+    return 'COMPLETED';
   }
 
   if (envelopeStatus === DocumentStatus.COMPLETED) {
@@ -267,85 +292,16 @@ const getNormalizedStatus = ({
     return 'EXPIRED';
   }
 
-  if (!envelopeStatus) {
+  if (!envelopeStatus || envelopeStatus === DocumentStatus.DRAFT) {
     return currentStatus === IntegrationSigningRequestStatus.DRAFT ? 'DRAFT' : 'READY';
   }
 
   if (envelopeStatus === DocumentStatus.PENDING) {
-    const actionableRecipients = getActionableRecipients(recipients);
-    const signedActionableCount = actionableRecipients.filter(
-      (recipient) => recipient.signingStatus === SigningStatus.SIGNED,
-    ).length;
-
-    if (signedActionableCount > 0) {
-      return 'PARTIALLY_COMPLETED';
-    }
-
-    return 'IN_PROGRESS';
+    return completedActionableCount > 0 ? 'PARTIALLY_COMPLETED' : 'IN_PROGRESS';
   }
 
   return 'READY';
 };
-
-const getCurrentActiveSigningOrder = (
-  recipients: Array<{
-    role: RecipientRole;
-    signingStatus: SigningStatus;
-    signingOrder: number | null;
-  }>,
-) => {
-  const pendingActionableRecipients = getActionableRecipients(recipients)
-    .filter((recipient) => recipient.signingStatus === SigningStatus.NOT_SIGNED)
-    .map((recipient) => recipient.signingOrder)
-    .filter((signingOrder): signingOrder is number => signingOrder !== null)
-    .sort((left, right) => left - right);
-
-  return pendingActionableRecipients[0] ?? null;
-};
-
-const getParticipantStatus = ({
-  participantRole,
-  recipient,
-  envelopeStatus,
-  currentActiveSigningOrder,
-}: {
-  participantRole: RecipientRole;
-  recipient?: {
-    signingStatus: SigningStatus;
-    signingOrder: number | null;
-  };
-  envelopeStatus?: DocumentStatus;
-  currentActiveSigningOrder: number | null;
-}): TIntegrationApiV1ParticipantStatusSchema => {
-  if (participantRole === RecipientRole.CC || participantRole === RecipientRole.VIEWER) {
-    return 'NOT_REQUIRED';
-  }
-
-  if (!recipient || envelopeStatus === DocumentStatus.DRAFT || !envelopeStatus) {
-    return 'NOT_STARTED';
-  }
-
-  if (recipient.signingStatus === SigningStatus.REJECTED) {
-    return 'REJECTED';
-  }
-
-  if (recipient.signingStatus === SigningStatus.SIGNED) {
-    return 'COMPLETED';
-  }
-
-  if (
-    envelopeStatus === DocumentStatus.PENDING &&
-    recipient.signingOrder !== null &&
-    currentActiveSigningOrder !== null &&
-    recipient.signingOrder > currentActiveSigningOrder
-  ) {
-    return 'WAITING_FOR_TURN';
-  }
-
-  return 'IN_PROGRESS';
-};
-
-const toIsoString = (value?: Date | null) => (value ? value.toISOString() : undefined);
 
 const buildSigningRequestResponse = async ({
   requestId,
@@ -359,6 +315,7 @@ const buildSigningRequestResponse = async ({
     include: {
       envelope: {
         include: {
+          documentMeta: true,
           recipients: {
             orderBy: {
               id: 'asc',
@@ -389,7 +346,6 @@ const buildSigningRequestResponse = async ({
   }
 
   const envelopeRecipients = integrationRequest.envelope?.recipients ?? [];
-  const currentActiveSigningOrder = getCurrentActiveSigningOrder(envelopeRecipients);
   const normalizedStatus = getNormalizedStatus({
     currentStatus: integrationRequest.status,
     envelopeStatus: integrationRequest.envelope?.status,
@@ -409,23 +365,139 @@ const buildSigningRequestResponse = async ({
   }
 
   const nativeRecipientsById = new Map(envelopeRecipients.map((recipient) => [recipient.id, recipient] as const));
+  const stageParticipantsByOrder = new Map<number, typeof integrationRequest.participants>();
+
+  for (const participant of integrationRequest.participants) {
+    const stageOrder = participant.stage?.order;
+
+    if (!stageOrder) {
+      continue;
+    }
+
+    const participants = stageParticipantsByOrder.get(stageOrder) ?? [];
+    participants.push(participant);
+    stageParticipantsByOrder.set(stageOrder, participants);
+  }
+
+  const requestIsReadyToActivate = normalizedStatus === 'READY' || normalizedStatus === 'DRAFT';
+  const requestIsActive = normalizedStatus === 'IN_PROGRESS' || normalizedStatus === 'PARTIALLY_COMPLETED';
+
+  const stageStateByOrder = new Map<
+    number,
+    {
+      status: TIntegrationApiV1StageStatusSchema;
+      completedAt?: string;
+      isActive: boolean;
+      isBlocked: boolean;
+      blockedReason?: TIntegrationApiV1BlockedReasonSchema;
+    }
+  >();
+
+  let previousStagesCompleted = true;
+
+  for (const stage of integrationRequest.stages) {
+    const stageParticipants = stageParticipantsByOrder.get(stage.order) ?? [];
+    const stageNativeRecipients = stageParticipants
+      .map((participant) =>
+        participant.nativeRecipientId ? nativeRecipientsById.get(participant.nativeRecipientId) : undefined,
+      )
+      .filter((recipient): recipient is NonNullable<typeof recipient> => Boolean(recipient));
+    const completedRecipients = stageNativeRecipients.filter(
+      (recipient) => recipient.signingStatus === SigningStatus.SIGNED,
+    );
+    const rejectedRecipient = stageNativeRecipients.find(
+      (recipient) => recipient.signingStatus === SigningStatus.REJECTED,
+    );
+    const allCompleted = stageParticipants.length > 0 && completedRecipients.length === stageParticipants.length;
+    const hasAnyCompletion = completedRecipients.length > 0;
+
+    let status: TIntegrationApiV1StageStatusSchema;
+    let blockedReason: TIntegrationApiV1BlockedReasonSchema | undefined;
+
+    if (allCompleted) {
+      status = 'COMPLETED';
+    } else if (rejectedRecipient) {
+      status = 'REJECTED';
+    } else if (normalizedStatus === 'FAILED') {
+      status = 'FAILED';
+    } else if (normalizedStatus === 'CANCELLED') {
+      status = 'CANCELLED';
+    } else if (normalizedStatus === 'EXPIRED') {
+      status = 'EXPIRED';
+    } else if (normalizedStatus === 'REJECTED') {
+      status = previousStagesCompleted ? 'BLOCKED' : 'BLOCKED';
+      blockedReason = 'REQUEST_TERMINATED';
+    } else if (requestIsReadyToActivate) {
+      status = 'WAITING';
+      blockedReason = 'REQUEST_NOT_ACTIVE';
+    } else if (!previousStagesCompleted) {
+      status = 'BLOCKED';
+      blockedReason = 'PREVIOUS_STAGE_INCOMPLETE';
+    } else if (hasAnyCompletion) {
+      status = 'PARTIALLY_COMPLETED';
+    } else {
+      status = 'ACTIVE';
+    }
+
+    stageStateByOrder.set(stage.order, {
+      status,
+      completedAt: allCompleted
+        ? toIsoString(
+            completedRecipients
+              .map((recipient) => recipient.signedAt)
+              .filter((value): value is Date => Boolean(value))
+              .sort((left, right) => right.getTime() - left.getTime())[0],
+          )
+        : undefined,
+      isActive: status === 'ACTIVE' || status === 'PARTIALLY_COMPLETED',
+      isBlocked: Boolean(blockedReason),
+      blockedReason,
+    });
+
+    previousStagesCompleted = previousStagesCompleted && allCompleted;
+  }
 
   const participants = integrationRequest.participants.map((participant) => {
     const nativeRecipient = participant.nativeRecipientId
       ? nativeRecipientsById.get(participant.nativeRecipientId)
       : undefined;
+    const stageOrder = participant.stage?.order ?? undefined;
+    const stageState = stageOrder ? stageStateByOrder.get(stageOrder) : undefined;
+    const isActionable = isActionableRole(participant.role) && stageOrder !== undefined;
 
-    const participantStatus = getParticipantStatus({
-      participantRole: participant.role,
-      recipient: nativeRecipient
-        ? {
-            signingStatus: nativeRecipient.signingStatus,
-            signingOrder: nativeRecipient.signingOrder,
-          }
-        : undefined,
-      envelopeStatus: integrationRequest.envelope?.status,
-      currentActiveSigningOrder,
-    });
+    let status: TIntegrationApiV1ParticipantStatusSchema;
+    let blockedReason: TIntegrationApiV1BlockedReasonSchema | undefined;
+
+    if (nativeRecipient?.signingStatus === SigningStatus.REJECTED) {
+      status = 'REJECTED';
+    } else if (nativeRecipient?.signingStatus === SigningStatus.SIGNED) {
+      status = 'COMPLETED';
+    } else if (normalizedStatus === 'FAILED') {
+      status = 'FAILED';
+    } else if (
+      normalizedStatus === 'EXPIRED' ||
+      (nativeRecipient?.expiresAt ? nativeRecipient.expiresAt.getTime() <= Date.now() : false)
+    ) {
+      status = 'EXPIRED';
+    } else if (normalizedStatus === 'CANCELLED') {
+      status = 'CANCELLED';
+    } else if (!isActionable) {
+      status =
+        nativeRecipient?.readStatus === ReadStatus.OPENED
+          ? 'VIEWED'
+          : requestIsActive || normalizedStatus === 'COMPLETED'
+            ? 'AVAILABLE'
+            : 'WAITING';
+    } else if (stageState?.blockedReason) {
+      status = 'WAITING';
+      blockedReason = stageState.blockedReason;
+    } else if (nativeRecipient?.readStatus === ReadStatus.OPENED) {
+      status = 'VIEWED';
+    } else if (requestIsActive || normalizedStatus === 'COMPLETED') {
+      status = 'AVAILABLE';
+    } else {
+      status = 'WAITING';
+    }
 
     return {
       participantId: participant.participantId,
@@ -433,16 +505,62 @@ const buildSigningRequestResponse = async ({
       displayName: participant.displayName ?? undefined,
       email: participant.email,
       role: participant.role as TIntegrationApiV1SigningRequestResponseSchema['participants'][number]['role'],
-      status: participantStatus,
-      stageOrder: participant.stage?.order ?? undefined,
+      status,
+      stageOrder,
       nativeSigningOrder: participant.nativeSigningOrder ?? undefined,
+      statusUpdatedAt:
+        toIsoString(nativeRecipient?.signedAt) ??
+        toIsoString(nativeRecipient?.sentAt) ??
+        toIsoString(nativeRecipient?.expiresAt),
       completedAt: toIsoString(nativeRecipient?.signedAt),
-      rejectedAt: toIsoString(participant.rejectedAt),
+      rejectedAt:
+        nativeRecipient?.signingStatus === SigningStatus.REJECTED
+          ? toIsoString(nativeRecipient.signedAt)
+          : toIsoString(participant.rejectedAt),
+      isActionable,
+      isBlocked: Boolean(blockedReason),
+      blockedReason,
       metadata: (participant.metadata ?? undefined) as
         | TIntegrationApiV1SigningRequestResponseSchema['participants'][number]['metadata']
         | undefined,
     };
   });
+
+  const timeline = [...participants]
+    .sort((left, right) => {
+      const leftStageOrder = left.stageOrder ?? Number.MAX_SAFE_INTEGER;
+      const rightStageOrder = right.stageOrder ?? Number.MAX_SAFE_INTEGER;
+
+      if (leftStageOrder !== rightStageOrder) {
+        return leftStageOrder - rightStageOrder;
+      }
+
+      const leftNativeSigningOrder = left.nativeSigningOrder ?? Number.MAX_SAFE_INTEGER;
+      const rightNativeSigningOrder = right.nativeSigningOrder ?? Number.MAX_SAFE_INTEGER;
+
+      if (leftNativeSigningOrder !== rightNativeSigningOrder) {
+        return leftNativeSigningOrder - rightNativeSigningOrder;
+      }
+
+      return left.participantId.localeCompare(right.participantId);
+    })
+    .map((participant) => ({
+      stageOrder: participant.stageOrder,
+      stageStatus: participant.stageOrder ? stageStateByOrder.get(participant.stageOrder)?.status : undefined,
+      stageCompletionPolicy: participant.stageOrder ? ('ALL_REQUIRED' as const) : undefined,
+      participantId: participant.participantId,
+      externalParticipantId: participant.externalParticipantId,
+      displayName: participant.displayName,
+      email: participant.email,
+      role: participant.role,
+      nativeSigningOrder: participant.nativeSigningOrder,
+      status: participant.status,
+      statusUpdatedAt: participant.statusUpdatedAt,
+      completedAt: participant.completedAt,
+      isActionable: participant.isActionable,
+      isBlocked: participant.isBlocked,
+      blockedReason: participant.blockedReason,
+    }));
 
   return {
     requestId: integrationRequest.id,
@@ -476,18 +594,31 @@ const buildSigningRequestResponse = async ({
     metadata: (integrationRequest.metadata ?? undefined) as
       | TIntegrationApiV1SigningRequestResponseSchema['metadata']
       | undefined,
-    stages: integrationRequest.stages.map((stage) => ({
-      order: stage.order,
-      nativeSigningOrder: stage.nativeSigningOrder,
-      participantIds: integrationRequest.participants
-        .filter((participant) => participant.stageId === stage.id)
-        .map((participant) => participant.participantId),
-    })),
+    stages: integrationRequest.stages.map((stage) => {
+      const stageState = stageStateByOrder.get(stage.order);
+
+      return {
+        order: stage.order,
+        nativeSigningOrder: stage.nativeSigningOrder,
+        completionPolicy: 'ALL_REQUIRED' as const,
+        status: stageState?.status ?? 'WAITING',
+        completedAt: stageState?.completedAt,
+        isActive: stageState?.isActive ?? false,
+        isBlocked: stageState?.isBlocked ?? false,
+        blockedReason: stageState?.blockedReason,
+        participantIds: integrationRequest.participants
+          .filter((participant) => participant.stageId === stage.id)
+          .map((participant) => participant.participantId),
+      };
+    }),
     participants,
+    timeline,
     createdAt: integrationRequest.createdAt.toISOString(),
     updatedAt: integrationRequest.updatedAt.toISOString(),
     completedAt: toIsoString(integrationRequest.envelope?.completedAt),
-    rejectedAt: toIsoString(integrationRequest.participants.find((participant) => participant.rejectedAt)?.rejectedAt),
+    rejectedAt: toIsoString(
+      envelopeRecipients.find((recipient) => recipient.signingStatus === SigningStatus.REJECTED)?.signedAt,
+    ),
   };
 };
 
@@ -682,4 +813,55 @@ export const createIntegrationApiV1SigningRequest = async ({
     ...createdRequest,
     idempotentReplay: false,
   };
+};
+
+export const sendIntegrationApiV1SigningRequest = async ({
+  requestId,
+  teamId,
+  requestMetadata,
+}: SendIntegrationSigningRequestOptions) => {
+  const integrationRequest = await prisma.integrationSigningRequest.findFirst({
+    where: {
+      id: requestId,
+      teamId,
+    },
+    include: {
+      envelope: {
+        include: {
+          recipients: true,
+          documentMeta: true,
+        },
+      },
+    },
+  });
+
+  if (!integrationRequest?.envelope) {
+    throw new AppError(AppErrorCode.NOT_FOUND, {
+      message: 'Signing request not found',
+    });
+  }
+
+  if (integrationRequest.status === IntegrationSigningRequestStatus.FAILED) {
+    throw new AppError(AppErrorCode.INVALID_REQUEST, {
+      message: 'Failed signing requests cannot be activated.',
+    });
+  }
+
+  if (integrationRequest.envelope.status === DocumentStatus.DRAFT) {
+    await sendDocument({
+      id: {
+        type: 'envelopeId',
+        id: integrationRequest.envelope.id,
+      },
+      userId: integrationRequest.userId,
+      teamId,
+      sendEmail: false,
+      requestMetadata,
+    });
+  }
+
+  return await getIntegrationApiV1SigningRequest({
+    requestId,
+    teamId,
+  });
 };

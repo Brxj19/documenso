@@ -36,16 +36,44 @@ export const ZIntegrationApiV1ParticipantRoleSchema = z.enum(['SIGNER', 'APPROVE
 
 export type TIntegrationApiV1ParticipantRoleSchema = z.infer<typeof ZIntegrationApiV1ParticipantRoleSchema>;
 
+export const ZIntegrationApiV1StageCompletionPolicySchema = z.enum(['ALL_REQUIRED']);
+
+export type TIntegrationApiV1StageCompletionPolicySchema = z.infer<typeof ZIntegrationApiV1StageCompletionPolicySchema>;
+
+export const ZIntegrationApiV1StageStatusSchema = z.enum([
+  'WAITING',
+  'ACTIVE',
+  'PARTIALLY_COMPLETED',
+  'COMPLETED',
+  'BLOCKED',
+  'REJECTED',
+  'EXPIRED',
+  'CANCELLED',
+  'FAILED',
+]);
+
+export type TIntegrationApiV1StageStatusSchema = z.infer<typeof ZIntegrationApiV1StageStatusSchema>;
+
 export const ZIntegrationApiV1ParticipantStatusSchema = z.enum([
-  'NOT_STARTED',
-  'IN_PROGRESS',
-  'WAITING_FOR_TURN',
+  'WAITING',
+  'AVAILABLE',
+  'VIEWED',
   'COMPLETED',
   'REJECTED',
-  'NOT_REQUIRED',
+  'EXPIRED',
+  'CANCELLED',
+  'FAILED',
 ]);
 
 export type TIntegrationApiV1ParticipantStatusSchema = z.infer<typeof ZIntegrationApiV1ParticipantStatusSchema>;
+
+export const ZIntegrationApiV1BlockedReasonSchema = z.enum([
+  'REQUEST_NOT_ACTIVE',
+  'PREVIOUS_STAGE_INCOMPLETE',
+  'REQUEST_TERMINATED',
+]);
+
+export type TIntegrationApiV1BlockedReasonSchema = z.infer<typeof ZIntegrationApiV1BlockedReasonSchema>;
 
 export const ZIntegrationApiV1MetadataValueSchema: z.ZodType<
   string | number | boolean | null | Array<unknown> | Record<string, unknown>
@@ -98,6 +126,7 @@ export const ZIntegrationApiV1ParticipantSchema = z.object({
 
 export const ZIntegrationApiV1StageSchema = z.object({
   order: z.number().int().min(1),
+  completionPolicy: ZIntegrationApiV1StageCompletionPolicySchema.optional().default('ALL_REQUIRED'),
   participantIds: z.array(z.string().min(1).max(120)).min(1).max(50),
 });
 
@@ -272,15 +301,43 @@ export const ZIntegrationApiV1SigningRequestParticipantResponseSchema = z.object
   status: ZIntegrationApiV1ParticipantStatusSchema,
   stageOrder: z.number().int().min(1).optional(),
   nativeSigningOrder: z.number().int().min(1).optional(),
+  statusUpdatedAt: z.string().datetime().optional(),
   completedAt: z.string().datetime().optional(),
   rejectedAt: z.string().datetime().optional(),
+  isActionable: z.boolean(),
+  isBlocked: z.boolean(),
+  blockedReason: ZIntegrationApiV1BlockedReasonSchema.optional(),
   metadata: ZIntegrationApiV1MetadataSchema.optional(),
 });
 
 export const ZIntegrationApiV1SigningRequestStageResponseSchema = z.object({
   order: z.number().int().min(1),
   nativeSigningOrder: z.number().int().min(1),
+  completionPolicy: ZIntegrationApiV1StageCompletionPolicySchema,
+  status: ZIntegrationApiV1StageStatusSchema,
+  completedAt: z.string().datetime().optional(),
+  isActive: z.boolean(),
+  isBlocked: z.boolean(),
+  blockedReason: ZIntegrationApiV1BlockedReasonSchema.optional(),
   participantIds: z.array(z.string().min(1).max(120)).min(1).max(50),
+});
+
+export const ZIntegrationApiV1SigningRequestTimelineEntrySchema = z.object({
+  stageOrder: z.number().int().min(1).optional(),
+  stageStatus: ZIntegrationApiV1StageStatusSchema.optional(),
+  stageCompletionPolicy: ZIntegrationApiV1StageCompletionPolicySchema.optional(),
+  participantId: z.string().min(1).max(120),
+  externalParticipantId: z.string().min(1).max(255).optional(),
+  displayName: z.string().min(1).max(255).optional(),
+  email: zEmail(),
+  role: ZIntegrationApiV1ParticipantRoleSchema,
+  nativeSigningOrder: z.number().int().min(1).optional(),
+  status: ZIntegrationApiV1ParticipantStatusSchema,
+  statusUpdatedAt: z.string().datetime().optional(),
+  completedAt: z.string().datetime().optional(),
+  isActionable: z.boolean(),
+  isBlocked: z.boolean(),
+  blockedReason: ZIntegrationApiV1BlockedReasonSchema.optional(),
 });
 
 export const ZIntegrationApiV1NativeDocumentReferenceSchema = z.object({
@@ -301,6 +358,7 @@ export const ZIntegrationApiV1SigningRequestResponseSchema = z.object({
   metadata: ZIntegrationApiV1MetadataSchema.optional(),
   stages: z.array(ZIntegrationApiV1SigningRequestStageResponseSchema).max(50),
   participants: z.array(ZIntegrationApiV1SigningRequestParticipantResponseSchema).max(50),
+  timeline: z.array(ZIntegrationApiV1SigningRequestTimelineEntrySchema).max(50),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   completedAt: z.string().datetime().optional(),
@@ -334,7 +392,7 @@ export const ZIntegrationApiV1CapabilitySchema = z.object({
   providerExecutionAvailable: z.literal(false),
   supportedWorkflowModes: z.array(z.enum(['STAGED'])).min(1),
   supportedDocumentCount: ZIntegrationApiV1DocumentCountCapabilitySchema,
-  releasePhase: z.literal('PHASE_2_SIGNING_REQUESTS'),
+  releasePhase: z.literal('PHASE_3_STAGE_ORCHESTRATION'),
 });
 
 export type TIntegrationApiV1CapabilitySchema = z.infer<typeof ZIntegrationApiV1CapabilitySchema>;

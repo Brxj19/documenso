@@ -49,6 +49,7 @@ import { getIntegrationApiV1CapabilitiesRoute } from './integration/route';
 import {
   createIntegrationApiV1SigningRequest,
   getIntegrationApiV1SigningRequest,
+  sendIntegrationApiV1SigningRequest,
 } from './integration/signing-requests';
 import { authenticatedMiddleware } from './middleware/authenticated';
 
@@ -147,6 +148,59 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
         status: 500,
         body: {
           message: 'Failed to load signing request',
+        },
+      };
+    }
+  }),
+
+  sendIntegrationSigningRequest: authenticatedMiddleware(async (args, _user, team, { metadata }) => {
+    if (!IS_INTEGRATION_API_V1_ENABLED()) {
+      return {
+        status: 404,
+        body: {
+          message: 'Not found',
+        },
+      };
+    }
+
+    try {
+      const body = await sendIntegrationApiV1SigningRequest({
+        requestId: args.params.requestId,
+        teamId: team.id,
+        requestMetadata: metadata,
+      });
+
+      return {
+        status: 200,
+        body,
+      };
+    } catch (error) {
+      const appError = AppError.parseError(error);
+
+      if (appError.code === 'INVALID_REQUEST' || appError.code === 'INVALID_BODY') {
+        return {
+          status: 400,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      if (appError.code === 'NOT_FOUND') {
+        return {
+          status: 404,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      console.error(error);
+
+      return {
+        status: 500,
+        body: {
+          message: 'Failed to activate signing request',
         },
       };
     }

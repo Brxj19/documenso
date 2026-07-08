@@ -41,6 +41,7 @@ import { toCheckboxCustomText, toRadioCustomText } from '../../utils/fields';
 import { getRecipientsWithMissingFields, isRecipientEmailValidForSending } from '../../utils/recipients';
 import { getEnvelopeWhereInput } from '../envelope/get-envelope-by-id';
 import { insertFormValuesInPdf } from '../pdf/insert-form-values-in-pdf';
+import { getActiveSequentialRecipientGroup } from '../recipient/sequential-signing-order';
 import { assertUserNotDisabledById } from '../user/assert-user-not-disabled';
 import { triggerWebhook } from '../webhooks/trigger/trigger-webhook';
 
@@ -150,10 +151,7 @@ export const sendDocument = async ({ id, userId, teamId, sendEmail, requestMetad
   let recipientsToNotify = envelope.recipients;
 
   if (signingOrder === DocumentSigningOrder.SEQUENTIAL) {
-    // Get the currently active recipient.
-    recipientsToNotify = envelope.recipients
-      .filter((r) => r.signingStatus === SigningStatus.NOT_SIGNED && r.role !== RecipientRole.CC)
-      .slice(0, 1);
+    recipientsToNotify = getActiveSequentialRecipientGroup(envelope.recipients);
   }
 
   if (envelope.envelopeItems.length === 0) {
