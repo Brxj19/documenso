@@ -5,6 +5,19 @@ import { z } from 'zod';
 
 extendZodWithOpenApi(z);
 
+const ZSha256HexSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-f0-9]{64}$/i, 'SHA-256 hashes must be 64 hexadecimal characters.')
+  .transform((value) => value.toLowerCase());
+
+const ZSha256AlgorithmInputSchema = z
+  .string()
+  .trim()
+  .refine((value) => /^(sha256|sha-256)$/i.test(value), {
+    message: 'Only SHA-256 content hashes are supported.',
+  });
+
 export const ZIntegrationApiV1StatusSchema = z.enum([
   'DRAFT',
   'READY',
@@ -20,6 +33,19 @@ export const ZIntegrationApiV1StatusSchema = z.enum([
 export type TIntegrationApiV1StatusSchema = z.infer<typeof ZIntegrationApiV1StatusSchema>;
 
 export const ZIntegrationApiV1ParticipantRoleSchema = z.enum(['SIGNER', 'APPROVER', 'VIEWER', 'CC']);
+
+export type TIntegrationApiV1ParticipantRoleSchema = z.infer<typeof ZIntegrationApiV1ParticipantRoleSchema>;
+
+export const ZIntegrationApiV1ParticipantStatusSchema = z.enum([
+  'NOT_STARTED',
+  'IN_PROGRESS',
+  'WAITING_FOR_TURN',
+  'COMPLETED',
+  'REJECTED',
+  'NOT_REQUIRED',
+]);
+
+export type TIntegrationApiV1ParticipantStatusSchema = z.infer<typeof ZIntegrationApiV1ParticipantStatusSchema>;
 
 export const ZIntegrationApiV1MetadataValueSchema: z.ZodType<
   string | number | boolean | null | Array<unknown> | Record<string, unknown>
@@ -39,50 +65,49 @@ export const ZIntegrationApiV1MetadataSchema = z.record(
   ZIntegrationApiV1MetadataValueSchema,
 );
 
-export const ZIntegrationApiV1DocumentHashSchema = z.object({
-  algorithm: z.string().min(1).max(32),
-  value: z.string().min(1).max(512),
+export const ZIntegrationApiV1DocumentHashInputSchema = z.object({
+  algorithm: ZSha256AlgorithmInputSchema,
+  value: ZSha256HexSchema,
 });
 
-export const ZIntegrationApiV1DocumentReferenceSchema = z.object({
+export const ZIntegrationApiV1DocumentHashSchema = z.object({
+  algorithm: z.literal('SHA-256'),
+  value: z.string().regex(/^[a-f0-9]{64}$/),
+});
+
+export const ZIntegrationApiV1SourceDocumentSchema = z.object({
   sourceReference: z.string().min(1).max(255),
-  filename: z.string().min(1).max(255),
-  mimeType: z.string().min(1).max(255),
-  contentHash: ZIntegrationApiV1DocumentHashSchema.optional(),
+  filename: z
+    .string()
+    .min(1)
+    .max(255)
+    .regex(/\.pdf$/i, 'The source filename must end with .pdf.'),
+  mimeType: z.literal('application/pdf'),
+  contentHash: ZIntegrationApiV1DocumentHashInputSchema,
   metadata: ZIntegrationApiV1MetadataSchema.optional(),
 });
 
-export const ZIntegrationApiV1ParticipantSchema = z
-  .object({
-    participantId: z.string().min(1).max(120),
-    externalParticipantId: z.string().min(1).max(255).optional(),
-    displayName: z.string().min(1).max(255).optional(),
-    email: zEmail().optional(),
-    role: ZIntegrationApiV1ParticipantRoleSchema,
-    metadata: ZIntegrationApiV1MetadataSchema.optional(),
-  })
-  .superRefine((participant, ctx) => {
-    if (!participant.email && !participant.externalParticipantId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'A participant must include an email or an external participant identifier.',
-        path: ['externalParticipantId'],
-      });
-    }
-  });
+export const ZIntegrationApiV1ParticipantSchema = z.object({
+  participantId: z.string().min(1).max(120),
+  externalParticipantId: z.string().min(1).max(255).optional(),
+  displayName: z.string().min(1).max(255).optional(),
+  email: zEmail(),
+  role: ZIntegrationApiV1ParticipantRoleSchema,
+  metadata: ZIntegrationApiV1MetadataSchema.optional(),
+});
 
-export const ZIntegrationApiV1SigningStageSchema = z.object({
+export const ZIntegrationApiV1StageSchema = z.object({
   order: z.number().int().min(1),
   participantIds: z.array(z.string().min(1).max(120)).min(1).max(50),
 });
 
-export const ZIntegrationApiV1RequestSchema = z
+export const ZIntegrationApiV1SigningRequestSchema = z
   .object({
     externalReference: z.string().min(1).max(255),
     title: z.string().min(1).max(255),
-    documentReferences: z.array(ZIntegrationApiV1DocumentReferenceSchema).min(1).max(20),
+    document: ZIntegrationApiV1SourceDocumentSchema,
     participants: z.array(ZIntegrationApiV1ParticipantSchema).min(1).max(50),
-    signingStages: z.array(ZIntegrationApiV1SigningStageSchema).min(1).max(50),
+    stages: z.array(ZIntegrationApiV1StageSchema).min(1).max(50),
     expiresAt: z.coerce.date().optional(),
     idempotencyKey: z.string().min(1).max(255).optional(),
     correlationId: z.string().min(1).max(255).optional(),
@@ -97,6 +122,7 @@ export const ZIntegrationApiV1RequestSchema = z
   })
   .superRefine((request, ctx) => {
     const participantIds = new Set<string>();
+    const normalizedEmails = new Set<string>();
 
     for (const [index, participant] of request.participants.entries()) {
       if (participantIds.has(participant.participantId)) {
@@ -107,10 +133,21 @@ export const ZIntegrationApiV1RequestSchema = z
         });
       }
 
+      const normalizedEmail = participant.email.trim().toLowerCase();
+
+      if (normalizedEmails.has(normalizedEmail)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate participant email "${participant.email}" after normalization.`,
+          path: ['participants', index, 'email'],
+        });
+      }
+
       participantIds.add(participant.participantId);
+      normalizedEmails.add(normalizedEmail);
     }
 
-    const stageOrders = request.signingStages.map((stage) => stage.order).sort((left, right) => left - right);
+    const stageOrders = request.stages.map((stage) => stage.order).sort((left, right) => left - right);
 
     stageOrders.forEach((order, index) => {
       const expectedOrder = index + 1;
@@ -118,8 +155,8 @@ export const ZIntegrationApiV1RequestSchema = z
       if (order !== expectedOrder) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Signing stages must use contiguous ordering starting at 1.',
-          path: ['signingStages'],
+          message: 'Stages must use contiguous ordering starting at 1 with no gaps.',
+          path: ['stages'],
         });
       }
     });
@@ -138,39 +175,39 @@ export const ZIntegrationApiV1RequestSchema = z
 
     const stagedParticipants = new Set<string>();
 
-    for (const [stageIndex, stage] of request.signingStages.entries()) {
+    for (const [stageIndex, stage] of request.stages.entries()) {
       const stageParticipantIds = new Set<string>();
 
       for (const participantId of stage.participantIds) {
         if (!participantIds.has(participantId)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: `Unknown participantId "${participantId}" referenced in signingStages.`,
-            path: ['signingStages', stageIndex, 'participantIds'],
+            message: `Unknown participantId "${participantId}" referenced in stages.`,
+            path: ['stages', stageIndex, 'participantIds'],
           });
         }
 
         if (stageParticipantIds.has(participantId)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: `Duplicate participantId "${participantId}" within a signing stage.`,
-            path: ['signingStages', stageIndex, 'participantIds'],
+            message: `Duplicate participantId "${participantId}" within a stage.`,
+            path: ['stages', stageIndex, 'participantIds'],
           });
         }
 
         if (stagedParticipants.has(participantId)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: `Participant "${participantId}" can only appear in one signing stage.`,
-            path: ['signingStages', stageIndex, 'participantIds'],
+            message: `Participant "${participantId}" can only appear in one stage.`,
+            path: ['stages', stageIndex, 'participantIds'],
           });
         }
 
         if (observerParticipants.has(participantId)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: `Participant "${participantId}" has a non-actionable role and cannot appear in signingStages.`,
-            path: ['signingStages', stageIndex, 'participantIds'],
+            message: `Participant "${participantId}" has a read-only role and cannot appear in stages.`,
+            path: ['stages', stageIndex, 'participantIds'],
           });
         }
 
@@ -183,14 +220,14 @@ export const ZIntegrationApiV1RequestSchema = z
       if (!stagedParticipants.has(actionableParticipantId)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: `Actionable participant "${actionableParticipantId}" must appear in signingStages.`,
-          path: ['signingStages'],
+          message: `Actionable participant "${actionableParticipantId}" must appear in stages.`,
+          path: ['stages'],
         });
       }
     }
   });
 
-export type TIntegrationApiV1RequestSchema = z.infer<typeof ZIntegrationApiV1RequestSchema>;
+export type TIntegrationApiV1SigningRequestSchema = z.infer<typeof ZIntegrationApiV1SigningRequestSchema>;
 
 export const ZIntegrationApiV1EventTypeSchema = z.enum([
   'REQUEST_CREATED',
@@ -218,6 +255,72 @@ export const ZIntegrationApiV1EventSchema = z.object({
 
 export type TIntegrationApiV1EventSchema = z.infer<typeof ZIntegrationApiV1EventSchema>;
 
+export const ZIntegrationApiV1SigningRequestDocumentSchema = z.object({
+  sourceReference: z.string().min(1).max(255),
+  filename: z.string().min(1).max(255),
+  mimeType: z.literal('application/pdf'),
+  verifiedContentHash: ZIntegrationApiV1DocumentHashSchema,
+  metadata: ZIntegrationApiV1MetadataSchema.optional(),
+});
+
+export const ZIntegrationApiV1SigningRequestParticipantResponseSchema = z.object({
+  participantId: z.string().min(1).max(120),
+  externalParticipantId: z.string().min(1).max(255).optional(),
+  displayName: z.string().min(1).max(255).optional(),
+  email: zEmail(),
+  role: ZIntegrationApiV1ParticipantRoleSchema,
+  status: ZIntegrationApiV1ParticipantStatusSchema,
+  stageOrder: z.number().int().min(1).optional(),
+  nativeSigningOrder: z.number().int().min(1).optional(),
+  completedAt: z.string().datetime().optional(),
+  rejectedAt: z.string().datetime().optional(),
+  metadata: ZIntegrationApiV1MetadataSchema.optional(),
+});
+
+export const ZIntegrationApiV1SigningRequestStageResponseSchema = z.object({
+  order: z.number().int().min(1),
+  nativeSigningOrder: z.number().int().min(1),
+  participantIds: z.array(z.string().min(1).max(120)).min(1).max(50),
+});
+
+export const ZIntegrationApiV1NativeDocumentReferenceSchema = z.object({
+  envelopeId: z.string().min(1).max(120),
+  documentId: z.number().int().positive().optional(),
+  status: z.enum(['DRAFT', 'PENDING', 'COMPLETED', 'REJECTED', 'CANCELLED']).optional(),
+});
+
+export const ZIntegrationApiV1SigningRequestResponseSchema = z.object({
+  requestId: z.string().min(1).max(120),
+  externalReference: z.string().min(1).max(255),
+  title: z.string().min(1).max(255),
+  status: ZIntegrationApiV1StatusSchema,
+  document: ZIntegrationApiV1SigningRequestDocumentSchema,
+  nativeDocument: ZIntegrationApiV1NativeDocumentReferenceSchema.optional(),
+  expiresAt: z.string().datetime().optional(),
+  correlationId: z.string().min(1).max(255).optional(),
+  metadata: ZIntegrationApiV1MetadataSchema.optional(),
+  stages: z.array(ZIntegrationApiV1SigningRequestStageResponseSchema).max(50),
+  participants: z.array(ZIntegrationApiV1SigningRequestParticipantResponseSchema).max(50),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  completedAt: z.string().datetime().optional(),
+  rejectedAt: z.string().datetime().optional(),
+});
+
+export type TIntegrationApiV1SigningRequestResponseSchema = z.infer<
+  typeof ZIntegrationApiV1SigningRequestResponseSchema
+>;
+
+export const ZIntegrationApiV1CreateSigningRequestResponseSchema = ZIntegrationApiV1SigningRequestResponseSchema.extend(
+  {
+    idempotentReplay: z.boolean(),
+  },
+);
+
+export type TIntegrationApiV1CreateSigningRequestResponseSchema = z.infer<
+  typeof ZIntegrationApiV1CreateSigningRequestResponseSchema
+>;
+
 export const ZIntegrationApiV1DocumentCountCapabilitySchema = z.object({
   minimum: z.number().int().min(1),
   maximum: z.number().int().min(1).nullable(),
@@ -227,11 +330,11 @@ export const ZIntegrationApiV1DocumentCountCapabilitySchema = z.object({
 export const ZIntegrationApiV1CapabilitySchema = z.object({
   apiVersion: z.literal('V1'),
   enabled: z.boolean(),
-  supportsMutation: z.literal(false),
+  supportsMutation: z.literal(true),
   providerExecutionAvailable: z.literal(false),
   supportedWorkflowModes: z.array(z.enum(['STAGED'])).min(1),
   supportedDocumentCount: ZIntegrationApiV1DocumentCountCapabilitySchema,
-  releasePhase: z.literal('PHASE_1_SKELETON'),
+  releasePhase: z.literal('PHASE_2_SIGNING_REQUESTS'),
 });
 
 export type TIntegrationApiV1CapabilitySchema = z.infer<typeof ZIntegrationApiV1CapabilitySchema>;

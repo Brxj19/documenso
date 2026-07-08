@@ -8,12 +8,14 @@ import {
 } from './schema';
 
 export const INTEGRATION_API_V1_CAPABILITIES_ROUTE = '/api/v1/integration/capabilities';
+export const INTEGRATION_API_V1_SIGNING_REQUESTS_ROUTE = '/api/v1/integration/signing-requests';
+export const INTEGRATION_API_V1_SIGNING_REQUEST_ROUTE = '/api/v1/integration/signing-requests/:requestId';
 
 export const getIntegrationApiV1Capabilities = (): TIntegrationApiV1CapabilitySchema =>
   ZIntegrationApiV1CapabilitySchema.parse({
     apiVersion: 'V1',
     enabled: true,
-    supportsMutation: false,
+    supportsMutation: true,
     providerExecutionAvailable: false,
     supportedWorkflowModes: ['STAGED'],
     supportedDocumentCount: {
@@ -21,7 +23,7 @@ export const getIntegrationApiV1Capabilities = (): TIntegrationApiV1CapabilitySc
       maximum: 1,
       multipleDocuments: false,
     },
-    releasePhase: 'PHASE_1_SKELETON',
+    releasePhase: 'PHASE_2_SIGNING_REQUESTS',
   });
 
 export const getIntegrationApiV1HealthResponse = (): TIntegrationApiV1HealthResponseSchema =>
