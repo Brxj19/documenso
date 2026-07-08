@@ -65,6 +65,7 @@ model User {
 
   folders   Folder[]
   envelopes Envelope[]
+  integrationSigningRequests IntegrationSigningRequest[]
 
   verificationTokens VerificationToken[]
   apiTokens          ApiToken[]
@@ -485,6 +486,7 @@ model Envelope {
   documentMeta   DocumentMeta @relation(fields: [documentMetaId], references: [id])
 
   envelopeAttachments EnvelopeAttachment[]
+  integrationSigningRequest IntegrationSigningRequest?
 
   @@index([type])
   @@index([status])
@@ -541,6 +543,18 @@ enum DocumentDataType {
 enum DocumentSigningOrder {
   PARALLEL
   SEQUENTIAL
+}
+
+enum IntegrationSigningRequestStatus {
+  DRAFT
+  READY
+  IN_PROGRESS
+  PARTIALLY_COMPLETED
+  COMPLETED
+  REJECTED
+  EXPIRED
+  CANCELLED
+  FAILED
 }
 
 model DocumentData {
@@ -656,6 +670,7 @@ model Recipient {
 
   cscCredential CscCredential?
   cscSession    CscSession?
+  integrationSigningRequestParticipant IntegrationSigningRequestParticipant?
 
   @@index([token])
   @@index([email])
@@ -668,6 +683,94 @@ model Recipient {
   @@index([nextReminderAt])
   @@index([email(ops: raw("gin_trgm_ops"))], map: "Recipient_email_trgm_idx", type: Gin)
   @@index([name(ops: raw("gin_trgm_ops"))], map: "Recipient_name_trgm_idx", type: Gin)
+}
+
+model IntegrationSigningRequest {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId Int
+  teamId Int
+
+  sourceEnvelopeId    String
+  sourceReference     String
+  sourceFilename      String
+  sourceMimeType      String
+  verifiedContentHash String
+  sourceMetadata      Json?
+
+  externalReference String
+  title             String
+
+  envelopeId String? @unique
+
+  status             IntegrationSigningRequestStatus @default(DRAFT)
+  requestFingerprint String
+  idempotencyKey     String?
+  correlationId      String?
+  expiresAt          DateTime?
+
+  metadata              Json?
+  callbackUrl           String?
+  callbackCorrelationId String?
+  callbackMetadata      Json?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team     Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  envelope Envelope? @relation(fields: [envelopeId], references: [id], onDelete: SetNull)
+
+  stages       IntegrationSigningRequestStage[]
+  participants IntegrationSigningRequestParticipant[]
+
+  @@unique([teamId, idempotencyKey], map: "IntegrationSigningRequest_teamId_idempotencyKey_key")
+  @@index([teamId, externalReference], map: "IntegrationSigningRequest_teamId_externalReference_idx")
+  @@index([teamId, status], map: "IntegrationSigningRequest_teamId_status_idx")
+  @@index([sourceEnvelopeId], map: "IntegrationSigningRequest_sourceEnvelopeId_idx")
+}
+
+model IntegrationSigningRequestStage {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  signingRequestId   String
+  order              Int
+  nativeSigningOrder Int
+
+  signingRequest IntegrationSigningRequest @relation(fields: [signingRequestId], references: [id], onDelete: Cascade)
+  participants   IntegrationSigningRequestParticipant[]
+
+  @@unique([signingRequestId, order], map: "IntegrationReqStage_requestId_order_key")
+  @@index([signingRequestId, nativeSigningOrder], map: "IntegrationReqStage_requestId_nativeOrder_idx")
+}
+
+model IntegrationSigningRequestParticipant {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  signingRequestId String
+  stageId          String?
+
+  participantId         String
+  externalParticipantId String?
+  displayName           String?
+  email                 String
+  role                  RecipientRole
+  metadata              Json?
+  nativeRecipientId     Int? @unique
+  nativeSigningOrder    Int?
+  completedAt           DateTime?
+  rejectedAt            DateTime?
+
+  signingRequest IntegrationSigningRequest @relation(fields: [signingRequestId], references: [id], onDelete: Cascade)
+  stage          IntegrationSigningRequestStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  nativeRecipient Recipient? @relation(fields: [nativeRecipientId], references: [id], onDelete: SetNull)
+
+  @@unique([signingRequestId, participantId], map: "IntegrationReqParticipant_requestId_participantId_key")
+  @@index([signingRequestId, stageId], map: "IntegrationReqParticipant_requestId_stageId_idx")
+  @@index([signingRequestId, role], map: "IntegrationReqParticipant_requestId_role_idx")
 }
 
 enum FieldType {
@@ -1055,6 +1158,7 @@ model Team {
   apiTokens  ApiToken[]
   webhooks   Webhook[]
   teamGroups TeamGroup[]
+  integrationSigningRequests IntegrationSigningRequest[]
 
   organisationId String
   organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)

@@ -4,8 +4,17 @@ import {
 } from '@documenso/trpc/server/template-router/schema';
 import { initContract } from '@ts-rest/core';
 
-import { INTEGRATION_API_V1_CAPABILITIES_ROUTE } from './integration/route';
-import { ZIntegrationApiV1HealthResponseSchema } from './integration/schema';
+import {
+  INTEGRATION_API_V1_CAPABILITIES_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUEST_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUESTS_ROUTE,
+} from './integration/route';
+import {
+  ZIntegrationApiV1CreateSigningRequestResponseSchema,
+  ZIntegrationApiV1HealthResponseSchema,
+  ZIntegrationApiV1SigningRequestResponseSchema,
+  ZIntegrationApiV1SigningRequestSchema,
+} from './integration/schema';
 import {
   ZAuthorizationHeadersSchema,
   ZCreateDocumentFromTemplateMutationResponseSchema,
@@ -59,7 +68,38 @@ export const ApiContractV1 = c.router(
       },
       summary: 'Get integration API V1 health and capabilities',
       description:
-        'Read-only discovery endpoint for the reusable signing-tool integration facade. Phase 1 exposes only health and capabilities and performs no document, recipient, signing, storage, audit, or webhook mutations.',
+        'Discovery endpoint for the reusable signing-tool integration facade. Phase 2 exposes the single-document signing-request create and status surfaces while remaining provider-neutral and leaving native send/sign flows unchanged.',
+    },
+
+    createIntegrationSigningRequest: {
+      method: 'POST',
+      path: INTEGRATION_API_V1_SIGNING_REQUESTS_ROUTE,
+      body: ZIntegrationApiV1SigningRequestSchema,
+      responses: {
+        200: ZIntegrationApiV1CreateSigningRequestResponseSchema,
+        201: ZIntegrationApiV1CreateSigningRequestResponseSchema,
+        400: ZUnsuccessfulResponseSchema,
+        401: ZUnsuccessfulResponseSchema,
+        404: ZUnsuccessfulResponseSchema,
+        409: ZUnsuccessfulResponseSchema,
+        500: ZUnsuccessfulResponseSchema,
+      },
+      summary: 'Create a normalized single-document signing request',
+      description:
+        'Creates a generic, provider-neutral signing request backed by a Documenso-managed single-PDF source document. The route verifies the caller-supplied SHA-256 hash server-side, maps staged participants to native recipients, enforces idempotency, and never sends the document or creates signing sessions.',
+    },
+
+    getIntegrationSigningRequest: {
+      method: 'GET',
+      path: INTEGRATION_API_V1_SIGNING_REQUEST_ROUTE,
+      responses: {
+        200: ZIntegrationApiV1SigningRequestResponseSchema,
+        401: ZUnsuccessfulResponseSchema,
+        404: ZUnsuccessfulResponseSchema,
+      },
+      summary: 'Get the normalized status for a signing request',
+      description:
+        'Returns the normalized request status, source-document verification details, staged participant mapping, and safe native-document references for a previously created signing request.',
     },
 
     getDocuments: {

@@ -2,27 +2,27 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ZIntegrationApiV1CapabilitySchema,
+  ZIntegrationApiV1CreateSigningRequestResponseSchema,
   ZIntegrationApiV1EventSchema,
-  ZIntegrationApiV1RequestSchema,
+  ZIntegrationApiV1SigningRequestResponseSchema,
+  ZIntegrationApiV1SigningRequestSchema,
   ZIntegrationApiV1StatusSchema,
 } from './schema';
 
 describe('integration api v1 schemas', () => {
-  it('parses valid normalized request, status, event, and capability payloads', () => {
-    const requestResult = ZIntegrationApiV1RequestSchema.safeParse({
+  it('parses valid signing-request, status, event, capability, and response payloads', () => {
+    const requestResult = ZIntegrationApiV1SigningRequestSchema.safeParse({
       externalReference: 'request-123',
       title: 'Employment Agreement',
-      documentReferences: [
-        {
-          sourceReference: 'doc-001',
-          filename: 'employment-agreement.pdf',
-          mimeType: 'application/pdf',
-          contentHash: {
-            algorithm: 'sha256',
-            value: 'abc123',
-          },
+      document: {
+        sourceReference: 'document_123',
+        filename: 'employment-agreement.pdf',
+        mimeType: 'application/pdf',
+        contentHash: {
+          algorithm: 'sha256',
+          value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         },
-      ],
+      },
       participants: [
         {
           participantId: 'participant-1',
@@ -32,7 +32,8 @@ describe('integration api v1 schemas', () => {
         },
         {
           participantId: 'participant-2',
-          externalParticipantId: 'crm-participant-2',
+          email: 'approver.two@example.com',
+          externalParticipantId: 'crm-approver-2',
           displayName: 'Approver Two',
           role: 'APPROVER',
         },
@@ -43,7 +44,7 @@ describe('integration api v1 schemas', () => {
           role: 'CC',
         },
       ],
-      signingStages: [
+      stages: [
         {
           order: 1,
           participantIds: ['participant-1'],
@@ -56,7 +57,6 @@ describe('integration api v1 schemas', () => {
       correlationId: 'correlation-123',
       metadata: {
         caseId: 'case-42',
-        retries: 0,
       },
     });
 
@@ -71,15 +71,12 @@ describe('integration api v1 schemas', () => {
       statusBefore: 'READY',
       statusAfter: 'IN_PROGRESS',
       correlationId: 'correlation-123',
-      metadata: {
-        origin: 'test-suite',
-      },
     });
 
     const capabilityResult = ZIntegrationApiV1CapabilitySchema.safeParse({
       apiVersion: 'V1',
       enabled: true,
-      supportsMutation: false,
+      supportsMutation: true,
       providerExecutionAvailable: false,
       supportedWorkflowModes: ['STAGED'],
       supportedDocumentCount: {
@@ -87,30 +84,174 @@ describe('integration api v1 schemas', () => {
         maximum: 1,
         multipleDocuments: false,
       },
-      releasePhase: 'PHASE_1_SKELETON',
+      releasePhase: 'PHASE_2_SIGNING_REQUESTS',
+    });
+
+    const responseResult = ZIntegrationApiV1SigningRequestResponseSchema.safeParse({
+      requestId: 'integration_request_123',
+      externalReference: 'request-123',
+      title: 'Employment Agreement',
+      status: 'READY',
+      document: {
+        sourceReference: 'document_123',
+        filename: 'employment-agreement.pdf',
+        mimeType: 'application/pdf',
+        verifiedContentHash: {
+          algorithm: 'SHA-256',
+          value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+      },
+      nativeDocument: {
+        envelopeId: 'envelope_123',
+        documentId: 123,
+        status: 'DRAFT',
+      },
+      stages: [
+        {
+          order: 1,
+          nativeSigningOrder: 1,
+          participantIds: ['participant-1'],
+        },
+      ],
+      participants: [
+        {
+          participantId: 'participant-1',
+          email: 'signer.one@example.com',
+          role: 'SIGNER',
+          status: 'NOT_STARTED',
+          stageOrder: 1,
+          nativeSigningOrder: 1,
+        },
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const createResponseResult = ZIntegrationApiV1CreateSigningRequestResponseSchema.safeParse({
+      requestId: 'integration_request_123',
+      externalReference: 'request-123',
+      title: 'Employment Agreement',
+      status: 'READY',
+      document: {
+        sourceReference: 'document_123',
+        filename: 'employment-agreement.pdf',
+        mimeType: 'application/pdf',
+        verifiedContentHash: {
+          algorithm: 'SHA-256',
+          value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+      },
+      stages: [],
+      participants: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      idempotentReplay: false,
     });
 
     expect(requestResult.success).toBe(true);
     expect(statusResult.success).toBe(true);
     expect(eventResult.success).toBe(true);
     expect(capabilityResult.success).toBe(true);
+    expect(responseResult.success).toBe(true);
+    expect(createResponseResult.success).toBe(true);
   });
 
-  it('rejects invalid request data', () => {
-    const result = ZIntegrationApiV1RequestSchema.safeParse({
+  it('rejects invalid source hashes and unsupported mime types', () => {
+    const result = ZIntegrationApiV1SigningRequestSchema.safeParse({
       externalReference: 'request-123',
       title: 'Employment Agreement',
-      documentReferences: [],
+      document: {
+        sourceReference: 'document_123',
+        filename: 'employment-agreement.txt',
+        mimeType: 'text/plain',
+        contentHash: {
+          algorithm: 'md5',
+          value: 'abc123',
+        },
+      },
       participants: [
         {
           participantId: 'participant-1',
+          email: 'signer.one@example.com',
           role: 'SIGNER',
         },
       ],
-      signingStages: [
+      stages: [
         {
           order: 1,
           participantIds: ['participant-1'],
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects duplicate normalized participant emails', () => {
+    const result = ZIntegrationApiV1SigningRequestSchema.safeParse({
+      externalReference: 'request-123',
+      title: 'Employment Agreement',
+      document: {
+        sourceReference: 'document_123',
+        filename: 'employment-agreement.pdf',
+        mimeType: 'application/pdf',
+        contentHash: {
+          algorithm: 'SHA-256',
+          value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+      },
+      participants: [
+        {
+          participantId: 'participant-1',
+          email: 'Signer@One.Example.com',
+          role: 'SIGNER',
+        },
+        {
+          participantId: 'participant-2',
+          email: 'signer@one.example.com',
+          role: 'APPROVER',
+        },
+      ],
+      stages: [
+        {
+          order: 1,
+          participantIds: ['participant-1', 'participant-2'],
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects non-contiguous stages and read-only participants inside stages', () => {
+    const result = ZIntegrationApiV1SigningRequestSchema.safeParse({
+      externalReference: 'request-123',
+      title: 'Employment Agreement',
+      document: {
+        sourceReference: 'document_123',
+        filename: 'employment-agreement.pdf',
+        mimeType: 'application/pdf',
+        contentHash: {
+          algorithm: 'SHA-256',
+          value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+      },
+      participants: [
+        {
+          participantId: 'participant-1',
+          email: 'signer.one@example.com',
+          role: 'SIGNER',
+        },
+        {
+          participantId: 'participant-2',
+          email: 'observer@example.com',
+          role: 'VIEWER',
+        },
+      ],
+      stages: [
+        {
+          order: 2,
+          participantIds: ['participant-1', 'participant-2'],
         },
       ],
     });
@@ -129,39 +270,5 @@ describe('integration api v1 schemas', () => {
 
     expect(statusResult.success).toBe(false);
     expect(eventResult.success).toBe(false);
-  });
-
-  it('rejects invalid signing stage ordering and participant placement', () => {
-    const result = ZIntegrationApiV1RequestSchema.safeParse({
-      externalReference: 'request-123',
-      title: 'Employment Agreement',
-      documentReferences: [
-        {
-          sourceReference: 'doc-001',
-          filename: 'employment-agreement.pdf',
-          mimeType: 'application/pdf',
-        },
-      ],
-      participants: [
-        {
-          participantId: 'participant-1',
-          email: 'signer.one@example.com',
-          role: 'SIGNER',
-        },
-        {
-          participantId: 'participant-2',
-          email: 'observer@example.com',
-          role: 'CC',
-        },
-      ],
-      signingStages: [
-        {
-          order: 2,
-          participantIds: ['participant-1', 'participant-2'],
-        },
-      ],
-    });
-
-    expect(result.success).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 import { getServerLimits } from '@documenso/ee/server-only/limits/server';
-import { NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
+import { IS_INTEGRATION_API_V1_ENABLED, NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
 import { DATE_FORMATS, DEFAULT_DOCUMENT_DATE_FORMAT } from '@documenso/lib/constants/date-formats';
 import { DocumentDataType, DocumentStatus, EnvelopeType, SigningStatus } from '@prisma/client';
 import { tsr } from '@ts-rest/serverless/fetch';
@@ -46,10 +46,111 @@ import { prisma } from '@documenso/prisma';
 
 import { ApiContractV1 } from './contract';
 import { getIntegrationApiV1CapabilitiesRoute } from './integration/route';
+import {
+  createIntegrationApiV1SigningRequest,
+  getIntegrationApiV1SigningRequest,
+} from './integration/signing-requests';
 import { authenticatedMiddleware } from './middleware/authenticated';
 
 export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
   getIntegrationCapabilities: authenticatedMiddleware(async () => getIntegrationApiV1CapabilitiesRoute()),
+
+  createIntegrationSigningRequest: authenticatedMiddleware(async (args, user, team, { metadata }) => {
+    if (!IS_INTEGRATION_API_V1_ENABLED()) {
+      return {
+        status: 404,
+        body: {
+          message: 'Not found',
+        },
+      };
+    }
+
+    try {
+      const body = await createIntegrationApiV1SigningRequest({
+        request: args.body,
+        userId: user.id,
+        teamId: team.id,
+        requestMetadata: metadata,
+      });
+
+      return {
+        status: body.idempotentReplay ? 200 : 201,
+        body,
+      };
+    } catch (error) {
+      const appError = AppError.parseError(error);
+
+      if (appError.code === 'INVALID_REQUEST' && appError.statusCode === 409) {
+        return {
+          status: 409,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      if (appError.code === 'INVALID_BODY' || appError.code === 'NOT_FOUND') {
+        return {
+          status: appError.code === 'NOT_FOUND' ? 404 : 400,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      console.error(error);
+
+      return {
+        status: 500,
+        body: {
+          message: 'Failed to create signing request',
+        },
+      };
+    }
+  }),
+
+  getIntegrationSigningRequest: authenticatedMiddleware(async (args, _user, team) => {
+    if (!IS_INTEGRATION_API_V1_ENABLED()) {
+      return {
+        status: 404,
+        body: {
+          message: 'Not found',
+        },
+      };
+    }
+
+    try {
+      const body = await getIntegrationApiV1SigningRequest({
+        requestId: args.params.requestId,
+        teamId: team.id,
+      });
+
+      return {
+        status: 200,
+        body,
+      };
+    } catch (error) {
+      const appError = AppError.parseError(error);
+
+      if (appError.code === 'NOT_FOUND') {
+        return {
+          status: 404,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      console.error(error);
+
+      return {
+        status: 500,
+        body: {
+          message: 'Failed to load signing request',
+        },
+      };
+    }
+  }),
 
   getDocuments: authenticatedMiddleware(async (args, user, team) => {
     const page = Number(args.query.page) || 1;

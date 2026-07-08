@@ -43,7 +43,7 @@ describe('integration api v1 route', () => {
     expect(response.body.capabilities).toMatchObject({
       apiVersion: 'V1',
       enabled: true,
-      supportsMutation: false,
+      supportsMutation: true,
       providerExecutionAvailable: false,
       supportedWorkflowModes: ['STAGED'],
       supportedDocumentCount: {
@@ -51,7 +51,7 @@ describe('integration api v1 route', () => {
         maximum: 1,
         multipleDocuments: false,
       },
-      releasePhase: 'PHASE_1_SKELETON',
+      releasePhase: 'PHASE_2_SIGNING_REQUESTS',
     });
   });
 
