@@ -40,6 +40,10 @@ export const ZIntegrationApiV1StageCompletionPolicySchema = z.enum(['ALL_REQUIRE
 
 export type TIntegrationApiV1StageCompletionPolicySchema = z.infer<typeof ZIntegrationApiV1StageCompletionPolicySchema>;
 
+export const ZIntegrationApiV1SigningSessionModeSchema = z.enum(['REDIRECT', 'EMBED']);
+
+export type TIntegrationApiV1SigningSessionModeSchema = z.infer<typeof ZIntegrationApiV1SigningSessionModeSchema>;
+
 export const ZIntegrationApiV1StageStatusSchema = z.enum([
   'WAITING',
   'ACTIVE',
@@ -385,14 +389,47 @@ export const ZIntegrationApiV1DocumentCountCapabilitySchema = z.object({
   multipleDocuments: z.boolean(),
 });
 
+export const ZIntegrationApiV1CreateSigningSessionSchema = z.object({
+  returnUrl: z.string().trim().min(1).max(2_000).optional(),
+  mode: ZIntegrationApiV1SigningSessionModeSchema.optional().default('REDIRECT'),
+  clientState: z.string().trim().min(1).max(255).optional(),
+  ttlSeconds: z.number().int().min(60).max(3_600).optional(),
+});
+
+export type TIntegrationApiV1CreateSigningSessionSchema = z.infer<typeof ZIntegrationApiV1CreateSigningSessionSchema>;
+
+export const ZIntegrationApiV1CreateSigningSessionResponseSchema = z.object({
+  sessionId: z.string().min(1).max(120),
+  requestId: z.string().min(1).max(120),
+  participantId: z.string().min(1).max(120),
+  mode: ZIntegrationApiV1SigningSessionModeSchema,
+  expiresAt: z.string().datetime(),
+  launchUrl: z.string().url(),
+  returnUrl: z.string().url().optional(),
+  clientState: z.string().min(1).max(255).optional(),
+  participantStatus: ZIntegrationApiV1ParticipantStatusSchema,
+  requestStatus: ZIntegrationApiV1StatusSchema,
+  embeddedSupported: z.boolean(),
+});
+
+export type TIntegrationApiV1CreateSigningSessionResponseSchema = z.infer<
+  typeof ZIntegrationApiV1CreateSigningSessionResponseSchema
+>;
+
 export const ZIntegrationApiV1CapabilitySchema = z.object({
   apiVersion: z.literal('V1'),
   enabled: z.boolean(),
   supportsMutation: z.literal(true),
   providerExecutionAvailable: z.literal(false),
   supportedWorkflowModes: z.array(z.enum(['STAGED'])).min(1),
+  supportedSigningModes: z.array(ZIntegrationApiV1SigningSessionModeSchema).min(1),
+  redirectSigningSupported: z.literal(true),
+  embeddedSigningSupported: z.literal(false),
+  sessionExpirySupported: z.literal(true),
+  returnUrlAllowlistSupported: z.literal(true),
+  callbackEventsSupported: z.literal(false),
   supportedDocumentCount: ZIntegrationApiV1DocumentCountCapabilitySchema,
-  releasePhase: z.literal('PHASE_3_STAGE_ORCHESTRATION'),
+  releasePhase: z.literal('PHASE_4_SIGNING_SESSIONS'),
 });
 
 export type TIntegrationApiV1CapabilitySchema = z.infer<typeof ZIntegrationApiV1CapabilitySchema>;

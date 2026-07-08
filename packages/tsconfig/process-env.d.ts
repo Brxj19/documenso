@@ -2,6 +2,7 @@ declare namespace NodeJS {
   export interface ProcessEnv {
     PORT?: string;
     INTEGRATION_API_V1_ENABLED?: 'true' | 'false';
+    INTEGRATION_API_V1_RETURN_URL_ALLOWLIST?: string;
     NEXT_PUBLIC_WEBAPP_URL?: string;
     NEXT_PRIVATE_DOCUMENSO_LICENSE_KEY?: string;
 

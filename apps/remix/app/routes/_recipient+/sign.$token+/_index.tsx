@@ -49,6 +49,10 @@ import { EnvelopeSigningProvider } from '~/components/general/document-signing/e
 import { RecipientBranding } from '~/components/general/recipient-branding';
 import { useCspNonce } from '~/utils/nonce';
 import { superLoaderJson, useSuperLoaderData } from '~/utils/super-json-loader';
+import {
+  getIntegrationSigningCompletionPath,
+  validateIntegrationSigningSessionAccessOrThrowNotFound,
+} from './_integration-session.server';
 
 import type { Route } from './+types/_index';
 
@@ -58,9 +62,17 @@ const handleV1Loader = async ({ params, request }: Route.LoaderArgs) => {
   const { user } = await getOptionalSession(request);
 
   const { token } = params;
+  const integrationSessionId = new URL(request.url).searchParams.get('integrationSessionId') ?? undefined;
 
   if (!token) {
     throw new Response('Not Found', { status: 404 });
+  }
+
+  if (integrationSessionId) {
+    await validateIntegrationSigningSessionAccessOrThrowNotFound({
+      sessionId: integrationSessionId,
+      token,
+    });
   }
 
   const [document, recipient, fields, completedFields] = await Promise.all([
@@ -153,7 +165,13 @@ const handleV1Loader = async ({ params, request }: Route.LoaderArgs) => {
   }
 
   if (document.status === DocumentStatus.COMPLETED || recipient.signingStatus === SigningStatus.SIGNED) {
-    throw redirect(documentMeta?.redirectUrl || `/sign/${token}/complete`);
+    throw redirect(
+      getIntegrationSigningCompletionPath({
+        token,
+        integrationSessionId,
+        redirectUrl: documentMeta?.redirectUrl,
+      }),
+    );
   }
 
   const [recipientSignatures, settings] = await Promise.all([
@@ -187,6 +205,18 @@ const handleV2Loader = async ({ params, request }: Route.LoaderArgs) => {
   const { requestMetadata } = getOptionalLoaderContext();
 
   const { user } = await getOptionalSession(request);
+  const integrationSessionId = new URL(request.url).searchParams.get('integrationSessionId') ?? undefined;
+
+  if (!token) {
+    throw new Response('Not Found', { status: 404 });
+  }
+
+  if (integrationSessionId) {
+    await validateIntegrationSigningSessionAccessOrThrowNotFound({
+      sessionId: integrationSessionId,
+      token,
+    });
+  }
 
   const envelopeForSigning = await getEnvelopeForRecipientSigning({
     token,
@@ -254,7 +284,13 @@ const handleV2Loader = async ({ params, request }: Route.LoaderArgs) => {
   }
 
   if (isCompleted) {
-    throw redirect(envelope.documentMeta.redirectUrl || `/sign/${token}/complete`);
+    throw redirect(
+      getIntegrationSigningCompletionPath({
+        token,
+        integrationSessionId,
+        redirectUrl: envelope.documentMeta.redirectUrl,
+      }),
+    );
   }
 
   if (isExpired) {

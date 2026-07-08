@@ -1,180 +1,247 @@
 # Integration API V1 Signing Requests
 
-Phase 3 extends the reusable signing-tool facade under `INTEGRATION_API_V1_ENABLED` with normalized stage orchestration for sequential, parallel, and hybrid signing requests.
+Phase 4 extends the reusable signing-tool facade under
+`INTEGRATION_API_V1_ENABLED` with recipient-scoped signing sessions that launch
+the existing Documenso signer through a thin redirect wrapper.
 
 ## Endpoints
 
+- `GET /api/v1/integration/capabilities`
 - `POST /api/v1/integration/signing-requests`
 - `POST /api/v1/integration/signing-requests/:requestId/send`
 - `GET /api/v1/integration/signing-requests/:requestId`
+- `POST /api/v1/integration/signing-requests/:requestId/participants/:participantId/signing-session`
+- `GET /sign/integration/:sessionId`
+- `GET /sign/integration/:sessionId/complete`
 - `GET /t/:teamUrl/integration/signing-requests/:requestId`
 
-## Routing Policy
+## Chosen Launch Model
 
-Phase 3 supports one public stage-completion policy:
+Phase 4 does not build a new signer UI.
 
-- `ALL_REQUIRED`
+Instead it uses:
 
-For V1 this means:
+- an integration-owned signing session row
+- a public launch wrapper URL
+- the existing native recipient route at `/sign/:token`
+- a public completion wrapper URL
 
-- every required participant in a stage must complete before the stage is complete
-- later stages stay blocked until all required participants in earlier stages complete
-- participants in the same active stage can act independently
-- a hybrid request completes only after every required participant in every stage completes
+The API never returns a raw native recipient token. The caller receives a
+launch URL like `/sign/integration/:sessionId`, and the wrapper validates:
 
-Unsupported policies are rejected at schema validation time.
+- feature-flag availability
+- session expiry
+- participant-to-recipient scope
+- active request eligibility
+- safe completion return behavior
 
-## Contract Shape
+After that validation, the wrapper redirects to the existing Documenso signer.
 
-The create route accepts:
+## Signing Session Endpoint
 
-- `externalReference`
-- `title`
-- `document`
-  - `sourceReference`
-  - `filename`
-  - `mimeType`
-  - required SHA-256 content hash
-- `participants`
-- `stages`
-  - `order`
-  - `participantIds`
-  - optional `completionPolicy`, currently limited to `ALL_REQUIRED`
-- optional `expiresAt`
-- optional `idempotencyKey`
-- optional correlation and safe metadata
+`POST /api/v1/integration/signing-requests/:requestId/participants/:participantId/signing-session`
 
-The status route returns a normalized read model with:
+Request body:
 
-- request status
-- verified source-document hash
-- safe native envelope/document references
-- stage order, stage status, and stage-completion policy
-- participant status, blocked/available state, and blocked reason when present
-- flattened participant timeline
-- timestamps where the native model exposes them safely
+- `mode`
+  - `REDIRECT` is supported
+  - `EMBED` is rejected in Phase 4
+- optional `returnUrl`
+- optional `clientState`
+- optional `ttlSeconds`
 
-## Native Mapping
+Response fields:
 
-The facade still creates a new native draft document from verified source bytes:
+- `sessionId`
+- `requestId`
+- `participantId`
+- `mode`
+- `expiresAt`
+- `launchUrl`
+- accepted `returnUrl`
+- echoed `clientState`
+- normalized `participantStatus`
+- normalized `requestStatus`
+- `embeddedSupported`
 
-- the caller source document is never mutated in place
-- actionable participants map to native recipients
-- participants in the same integration stage share the same native `signingOrder`
-- later stages map to higher native `signingOrder` values
-- read-only participants stay outside staged routing order
+## Redirect Flow
 
-Phase 3 reuses the existing Documenso signing engine and extends its sequential-group interpretation so that equal native `signingOrder` values behave as one active stage.
+The supported Phase 4 consumer flow is:
 
-## Activation
+1. Create a signing request.
+2. Activate it with `send`.
+3. Create a participant-specific signing session.
+4. Redirect the browser to the returned `launchUrl`.
+5. The wrapper validates the session and redirects into the native signer.
+6. The signer completes in the existing Documenso signing screen.
+7. Completion returns through `/sign/integration/:sessionId/complete`.
+8. The completion wrapper redirects to the accepted safe `returnUrl`, or falls
+   back to the native completion page when no `returnUrl` was stored.
 
-`POST /api/v1/integration/signing-requests/:requestId/send` is the minimal activation endpoint added in Phase 3.
+The completion redirect appends only minimal safe query params:
 
-It is:
+- `requestId`
+- `participantId`
+- `status`
+- `clientState` when provided
 
-- authenticated through the existing API token middleware
-- feature-gated by `INTEGRATION_API_V1_ENABLED`
-- team-scoped
-- limited to integration-created requests
-- safe to retry
+## Eligibility Rules
+
+Phase 4 session creation rejects requests when:
+
+- the feature flag is disabled
+- the request is unknown or outside the caller team scope
+- the participant is unknown or outside the request
+- the request has not been activated
+- the request is already terminal
+- the participant is blocked by an earlier stage
+- the participant is already completed, rejected, cancelled, expired, or failed
+- the participant lacks a native actionable recipient mapping
+- the `returnUrl` is unsafe or not allowlisted
+- the requested mode is unsupported
+
+Unknown or inaccessible request and participant combinations are returned as
+not-found style responses to avoid leaking scope.
+
+## Session Expiry
+
+Phase 4 adds persisted integration signing sessions with:
+
+- `sessionId`
+- request reference
+- participant reference
+- native recipient reference
+- mode
+- optional `returnUrl`
+- optional `clientState`
+- `expiresAt`
+- `launchedAt`
+- `completedAt`
 
 Behavior:
 
-- a `READY` request transitions into the native Documenso send/sign lifecycle
-- retries against an already active or terminal request return the current normalized view instead of creating duplicate sends
-- the route uses `sendEmail: false`, so activation does not create duplicate email sends on retry
-- later stage notifications continue to follow native Documenso behavior and respect the document’s derived email settings
+- default TTL is 15 minutes
+- maximum TTL is 60 minutes
+- expired sessions cannot launch
+- expired sessions are also blocked at completion-time mutation validation
+- raw document bytes and recipient secrets are not stored in the session row
 
-## Status Normalization
+Because the native recipient token model remains the underlying signer transport,
+Phase 4 enforces expiry at the integration wrapper layer instead of replacing
+the existing token format.
 
-Public request status remains:
+## Return URL Allowlist
 
-- `DRAFT`
-- `READY`
-- `IN_PROGRESS`
-- `PARTIALLY_COMPLETED`
-- `COMPLETED`
-- `REJECTED`
-- `EXPIRED`
-- `CANCELLED`
-- `FAILED`
+Phase 4 adds:
 
-Stage status now includes:
+- `INTEGRATION_API_V1_RETURN_URL_ALLOWLIST`
 
-- `WAITING`
-- `ACTIVE`
-- `PARTIALLY_COMPLETED`
-- `COMPLETED`
-- `BLOCKED`
-- `REJECTED`
-- `EXPIRED`
-- `CANCELLED`
-- `FAILED`
+This is a comma-separated allowlist of absolute `http` or `https` values.
 
-Participant status now includes:
+Supported patterns:
 
-- `WAITING`
-- `AVAILABLE`
-- `VIEWED`
-- `COMPLETED`
-- `REJECTED`
-- `EXPIRED`
-- `CANCELLED`
-- `FAILED`
+- exact origins such as `http://localhost:3000`
+- exact URLs such as `http://localhost:3000/integration/return`
 
-Blocked participants and stages can also expose these reason codes:
+Rejected values include:
 
-- `REQUEST_NOT_ACTIVE`
-- `PREVIOUS_STAGE_INCOMPLETE`
-- `REQUEST_TERMINATED`
+- non-absolute URLs
+- malformed URLs
+- non-HTTP schemes
+- `javascript:` or `data:` URLs
+- protocol-relative URLs
+- unknown origins or URLs
 
-## Routing Behavior
+An empty allowlist means caller-supplied `returnUrl` values are rejected.
 
-Sequential:
+## Embedded Signing Status
 
-- Stage 1 becomes active after activation
-- Stage 2 and later stay blocked until all earlier stages complete
+Phase 4 does not expose embedded signing for the integration facade.
 
-Parallel:
+Capabilities report:
 
-- all participants in the active stage share the same native order
-- one completion yields `PARTIALLY_COMPLETED`
-- the stage completes only when every required participant in that stage completes
+- redirect signing supported: `true`
+- embedded signing supported: `false`
+- supported signing modes: `['REDIRECT']`
 
-Hybrid:
+This keeps the Phase 4 surface aligned with the safest Community Edition path:
+redirect into the existing signer.
 
-- sequential stage
-- then parallel stage
-- then sequential stage
+## Participant Identity and Scope
 
-The next stage does not unlock until the entire previous stage finishes under `ALL_REQUIRED`.
+Each integration signing session maps:
 
-## Participant Timeline
+- one integration request
+- one integration participant
+- one native Documenso recipient
 
-The normalized timeline is flattened per participant and includes:
+The wrapper only launches the native signer for that recipient token, and the
+completion mutation validates the optional `integrationSessionId` against the
+recipient token before the document can be completed.
 
-- stage order
-- stage status
-- stage-completion policy
-- participant identifier and safe display information
-- role
-- native signing order
-- normalized participant status
-- status timestamp where available
-- completion timestamp where available
-- actionable flag
-- blocked flag
-- blocked reason when present
+This preserves the native recipient-token model while preventing a session from
+being used to complete a different participant.
 
-## Safety Boundaries
+## Native Signer Behavior
 
-Phase 3 still does not:
+Phase 4 continues to reuse the existing signer for:
 
-- add provider-specific workflow rules
-- expose organization-specific terminology or fields
-- create embedded signing SDK behavior
-- add cancellation/reminder workflow endpoints
-- implement non-`ALL_REQUIRED` completion policies
-- change certificate sealing behavior
+- PDF rendering
+- required-field handling
+- sign intent
+- recipient access auth
+- recipient status transitions
+- document completion
+- certificate-backed finalization
 
-It also does not add broad workflow controls to the UI. The team details page remains read-only and is intended for inspection of normalized routing state only.
+No Phase 4 field-placement system was added. Integration-created requests can
+still complete without fields when the native signer permits it.
+
+## Capabilities
+
+`GET /api/v1/integration/capabilities` now reports:
+
+- `releasePhase: PHASE_4_SIGNING_SESSIONS`
+- `supportedSigningModes: ['REDIRECT']`
+- `redirectSigningSupported: true`
+- `embeddedSigningSupported: false`
+- `sessionExpirySupported: true`
+- `returnUrlAllowlistSupported: true`
+- `callbackEventsSupported: false`
+
+Phase 4 does not add a new callback delivery framework. Consumers should rely
+on the normalized status endpoint and, when configured, the safe completion
+return URL.
+
+## Minimal Example
+
+Example backend flow:
+
+1. `POST /api/v1/integration/signing-requests`
+2. `POST /api/v1/integration/signing-requests/:requestId/send`
+3. `POST /api/v1/integration/signing-requests/:requestId/participants/:participantId/signing-session`
+4. Redirect the browser to `launchUrl`
+5. After return, call `GET /api/v1/integration/signing-requests/:requestId`
+
+Example generic references:
+
+- title: `Contract Review`
+- participants: `Signer One`, `Signer Two`
+- external reference: `EXT-EXAMPLE-001`
+
+## Out of Scope
+
+Phase 4 still does not add:
+
+- provider abstraction beyond Documenso
+- embedded signing SDK behavior
+- arbitrary open redirects
+- document-owner signing URLs
+- reminder workflows
+- bulk signing
+- external provider integrations
+- a new callback delivery framework
+- domain-specific UI or vocabulary
+
+The internal team request-details page remains read-only. The documentation is
+the supported example surface for launching sessions in this phase.

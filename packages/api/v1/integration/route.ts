@@ -11,6 +11,8 @@ export const INTEGRATION_API_V1_CAPABILITIES_ROUTE = '/api/v1/integration/capabi
 export const INTEGRATION_API_V1_SIGNING_REQUESTS_ROUTE = '/api/v1/integration/signing-requests';
 export const INTEGRATION_API_V1_SIGNING_REQUEST_ROUTE = '/api/v1/integration/signing-requests/:requestId';
 export const INTEGRATION_API_V1_SIGNING_REQUEST_SEND_ROUTE = '/api/v1/integration/signing-requests/:requestId/send';
+export const INTEGRATION_API_V1_SIGNING_SESSION_ROUTE =
+  '/api/v1/integration/signing-requests/:requestId/participants/:participantId/signing-session';
 
 export const getIntegrationApiV1Capabilities = (): TIntegrationApiV1CapabilitySchema =>
   ZIntegrationApiV1CapabilitySchema.parse({
@@ -19,12 +21,18 @@ export const getIntegrationApiV1Capabilities = (): TIntegrationApiV1CapabilitySc
     supportsMutation: true,
     providerExecutionAvailable: false,
     supportedWorkflowModes: ['STAGED'],
+    supportedSigningModes: ['REDIRECT'],
+    redirectSigningSupported: true,
+    embeddedSigningSupported: false,
+    sessionExpirySupported: true,
+    returnUrlAllowlistSupported: true,
+    callbackEventsSupported: false,
     supportedDocumentCount: {
       minimum: 1,
       maximum: 1,
       multipleDocuments: false,
     },
-    releasePhase: 'PHASE_3_STAGE_ORCHESTRATION',
+    releasePhase: 'PHASE_4_SIGNING_SESSIONS',
   });
 
 export const getIntegrationApiV1HealthResponse = (): TIntegrationApiV1HealthResponseSchema =>

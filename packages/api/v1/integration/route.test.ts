@@ -10,7 +10,11 @@ vi.mock('@documenso/lib/server-only/envelope/create-envelope', () => ({
   createEnvelope: vi.fn(),
 }));
 
-import { getIntegrationApiV1CapabilitiesRoute, INTEGRATION_API_V1_CAPABILITIES_ROUTE } from './route';
+import {
+  getIntegrationApiV1CapabilitiesRoute,
+  INTEGRATION_API_V1_CAPABILITIES_ROUTE,
+  INTEGRATION_API_V1_SIGNING_SESSION_ROUTE,
+} from './route';
 
 describe('integration api v1 route', () => {
   afterEach(() => {
@@ -26,6 +30,9 @@ describe('integration api v1 route', () => {
       message: 'Not found',
     });
     expect(INTEGRATION_API_V1_CAPABILITIES_ROUTE).toBe('/api/v1/integration/capabilities');
+    expect(INTEGRATION_API_V1_SIGNING_SESSION_ROUTE).toBe(
+      '/api/v1/integration/signing-requests/:requestId/participants/:participantId/signing-session',
+    );
   });
 
   it('returns the expected read-only V1 capabilities when enabled', async () => {
@@ -46,12 +53,18 @@ describe('integration api v1 route', () => {
       supportsMutation: true,
       providerExecutionAvailable: false,
       supportedWorkflowModes: ['STAGED'],
+      supportedSigningModes: ['REDIRECT'],
+      redirectSigningSupported: true,
+      embeddedSigningSupported: false,
+      sessionExpirySupported: true,
+      returnUrlAllowlistSupported: true,
+      callbackEventsSupported: false,
       supportedDocumentCount: {
         minimum: 1,
         maximum: 1,
         multipleDocuments: false,
       },
-      releasePhase: 'PHASE_3_STAGE_ORCHESTRATION',
+      releasePhase: 'PHASE_4_SIGNING_SESSIONS',
     });
   });
 

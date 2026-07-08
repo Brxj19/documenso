@@ -118,6 +118,21 @@ GET /api/v1/integration/capabilities
 When the flag is absent or set to anything other than `"true"`, the endpoint
 returns a not-found style response and exposes no capabilities.
 
+## Enable Phase 4 Signing Sessions Locally
+
+Phase 4 keeps the facade behind the same feature flag and adds a safe return URL
+allowlist for redirect-mode signing sessions.
+
+Add this to `.env` for local verification:
+
+```text
+INTEGRATION_API_V1_ENABLED="true"
+INTEGRATION_API_V1_RETURN_URL_ALLOWLIST="http://localhost:3000,http://127.0.0.1:3000"
+```
+
+That allows local consumers to request redirect sessions and return safely to a
+same-machine callback page after signing completes.
+
 ## Baseline Signing Verification
 
 Create a harmless local PDF outside tracked source folders before any manual

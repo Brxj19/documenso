@@ -27,6 +27,7 @@ import type { Field } from '@prisma/client';
 import { FieldType, RecipientRole } from '@prisma/client';
 import { LucideChevronDown, LucideChevronUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { match, P } from 'ts-pattern';
 
 import { DocumentSigningAttachmentsPopover } from '~/components/general/document-signing/document-signing-attachments-popover';
@@ -45,7 +46,6 @@ import { DocumentSigningSignatureField } from '~/components/general/document-sig
 import { DocumentSigningTextField } from '~/components/general/document-signing/document-signing-text-field';
 import PDFViewerLazy from '~/components/general/pdf-viewer/pdf-viewer-lazy';
 
-import { useRequiredDocumentSigningAuthContext } from './document-signing-auth-provider';
 import { DocumentSigningCompleteDialog } from './document-signing-complete-dialog';
 import { DocumentSigningRecipientProvider } from './document-signing-recipient-provider';
 
@@ -75,13 +75,9 @@ export const DocumentSigningPageViewV1 = ({
   includeSenderDetails,
   branding,
 }: DocumentSigningPageViewV1Props) => {
-  const { documentData, documentMeta } = document;
-
-  const { derivedRecipientAccessAuth, user: authUser } = useRequiredDocumentSigningAuthContext();
-
-  const hasAuthenticator = authUser?.twoFactorEnabled
-    ? authUser.twoFactorEnabled && authUser.email === recipient.email
-    : false;
+  const { documentMeta } = document;
+  const [searchParams] = useSearchParams();
+  const integrationSessionId = searchParams.get('integrationSessionId');
 
   const analytics = useAnalytics();
 
@@ -112,6 +108,7 @@ export const DocumentSigningPageViewV1 = ({
     const payload = {
       token: recipient.token,
       documentId: document.id,
+      integrationSessionId: integrationSessionId ?? undefined,
       accessAuthOptions,
       ...(nextSigner?.email && nextSigner?.name ? { nextSigner } : {}),
     };
@@ -124,7 +121,9 @@ export const DocumentSigningPageViewV1 = ({
       timestamp: new Date().toISOString(),
     });
 
-    if (documentMeta?.redirectUrl) {
+    if (integrationSessionId) {
+      window.location.href = `/sign/integration/${integrationSessionId}/complete`;
+    } else if (documentMeta?.redirectUrl) {
       window.location.href = documentMeta.redirectUrl;
     } else {
       window.location.href = `/sign/${recipient.token}/complete`;
