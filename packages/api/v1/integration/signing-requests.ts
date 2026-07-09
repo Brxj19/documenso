@@ -13,6 +13,7 @@ import { resendDocument } from '@documenso/lib/server-only/document/resend-docum
 import { sendDocument } from '@documenso/lib/server-only/document/send-document';
 import { createEnvelope } from '@documenso/lib/server-only/envelope/create-envelope';
 import { getEnvelopeById } from '@documenso/lib/server-only/envelope/get-envelope-by-id';
+import { createEnvelopeFields } from '@documenso/lib/server-only/field/create-envelope-fields';
 import { sha256 } from '@documenso/lib/universal/crypto';
 import type { ApiRequestMetadata } from '@documenso/lib/universal/extract-request-metadata';
 import { prefixedId } from '@documenso/lib/universal/id';
@@ -25,6 +26,7 @@ import {
   DocumentSigningOrder,
   DocumentStatus,
   EnvelopeType,
+  FieldType,
   IntegrationSigningEventSource,
   IntegrationSigningEventType,
   IntegrationSigningRequestStatus,
@@ -862,6 +864,8 @@ export const sendIntegrationApiV1SigningRequest = async ({
       envelope: {
         include: {
           recipients: true,
+          fields: true,
+          envelopeItems: true,
           documentMeta: true,
         },
       },
@@ -874,6 +878,8 @@ export const sendIntegrationApiV1SigningRequest = async ({
     });
   }
 
+  const envelope = integrationRequest.envelope;
+
   const snapshot = await getIntegrationApiV1SigningRequest({
     requestId,
     teamId,
@@ -881,11 +887,45 @@ export const sendIntegrationApiV1SigningRequest = async ({
 
   assertIntegrationRequestNotTerminal(snapshot.status);
 
-  if (integrationRequest.envelope.status === DocumentStatus.DRAFT) {
+  const signerRecipients = envelope.recipients.filter(
+    (r) => r.role === RecipientRole.SIGNER && r.signingStatus !== SigningStatus.SIGNED,
+  );
+
+  const existingFieldRecipientIds = new Set(
+    envelope.fields.filter((f) => f.type === FieldType.SIGNATURE).map((f) => f.recipientId),
+  );
+
+  const recipientsNeedingFields = signerRecipients.filter((r) => !existingFieldRecipientIds.has(r.id));
+
+  if (recipientsNeedingFields.length > 0) {
+    const firstItem = envelope.envelopeItems[0];
+
+    if (firstItem) {
+      await createEnvelopeFields({
+        userId: integrationRequest.userId,
+        teamId,
+        id: { type: 'envelopeId', id: envelope.id },
+        fields: recipientsNeedingFields.map((recipient, index) => ({
+          type: FieldType.SIGNATURE,
+          fieldMeta: { type: 'signature', overflow: 'auto' },
+          recipientId: recipient.id,
+          envelopeItemId: firstItem.id,
+          page: 1,
+          positionX: 10,
+          positionY: 10 + index * 15,
+          width: 20,
+          height: 10,
+        })),
+        requestMetadata,
+      });
+    }
+  }
+
+  if (envelope.status === DocumentStatus.DRAFT) {
     await sendDocument({
       id: {
         type: 'envelopeId',
-        id: integrationRequest.envelope.id,
+        id: envelope.id,
       },
       userId: integrationRequest.userId,
       teamId,
