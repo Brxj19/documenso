@@ -109,26 +109,52 @@ export function buildSigningSessionEntry(participantId: string, sessionCreated: 
 
 function formatSigningEventDescription(evt: EvidenceEvent): string {
   switch (evt.type) {
-    case 'DOCUMENT_SENT':
-      return 'Signing request sent to participants';
-    case 'SIGNER_SIGNED':
-      return `${evt.actorName ?? 'A participant'} signed the document`;
-    case 'SIGNER_REJECTED':
-      return `${evt.actorName ?? 'A participant'} rejected the document`;
-    case 'DOCUMENT_COMPLETED':
-      return 'All participants signed — document completed';
-    case 'DOCUMENT_SEALED':
-      return 'Final artifact sealed and captured';
-    case 'DOCUMENT_FROZEN':
-      return 'Document frozen for eSignature';
+    case 'REQUEST_CREATED':
     case 'SIGNING_REQUEST_CREATED':
       return 'Signing request created';
+    case 'REQUEST_SENT':
+    case 'DOCUMENT_SENT':
+      return 'Signing request sent to participants';
+    case 'PARTICIPANT_COMPLETED':
+    case 'SIGNER_SIGNED':
+      return `${evt.actorName ?? 'A participant'} signed the document`;
+    case 'PARTICIPANT_REJECTED':
+    case 'SIGNER_REJECTED':
+      return `${evt.actorName ?? 'A participant'} rejected the document`;
+    case 'REQUEST_COMPLETED':
+    case 'DOCUMENT_COMPLETED':
+      return 'All participants signed — document completed';
+    case 'REQUEST_PARTIALLY_COMPLETED':
+      return 'Some participants have completed — request partially completed';
+    case 'FINAL_ARTIFACT_CAPTURED':
+    case 'DOCUMENT_SEALED':
+      return 'Final artifact sealed and captured';
     case 'SIGNING_SESSION_CREATED':
       return `Signing session created for ${evt.actorName ?? 'a participant'}`;
+    case 'SIGNING_SESSION_LAUNCHED':
+      return `Signing session launched for ${evt.actorName ?? 'a participant'}`;
     case 'SIGNER_VERIFIED':
       return `Signer verified: ${evt.actorName ?? 'a participant'}`;
     case 'SIGNER_VERIFICATION_FAILED':
       return `Signer verification failed for ${evt.actorName ?? 'a participant'}`;
+    case 'REQUEST_CANCELLED':
+      return 'Signing request cancelled';
+    case 'REQUEST_EXPIRED':
+      return 'Signing request expired';
+    case 'REQUEST_FAILED':
+      return 'Signing request failed';
+    case 'CALLBACK_QUEUED':
+      return 'Callback queued for delivery';
+    case 'CALLBACK_DELIVERED':
+      return 'Callback delivered successfully';
+    case 'CALLBACK_FAILED':
+      return 'Callback delivery failed';
+    case 'RECONCILIATION_REFRESHED':
+      return 'State reconciliation refreshed';
+    case 'REMINDER_SENT':
+      return 'Reminder sent to participant';
+    case 'REMINDER_ATTEMPTED':
+      return 'Reminder delivery attempted';
     case 'IDENTITY_SOURCE':
       return evt.description ?? 'Identity source recorded';
     case 'INTEGRATION_ERROR':

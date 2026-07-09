@@ -45,8 +45,12 @@ import {
   createWorkflowForFile,
   freezeWorkflowDocument,
   getParticipantById,
+  getParticipantStatusByStage,
   getWorkflowBySigningRequestId,
+  getWorkflowForFile,
   mapIntegrationStatusToDms,
+  updateEvidenceState,
+  updateParticipantStatus,
   updateSigningRequestId,
   updateSigningRequestStatus,
 } from '../../apps/remix/app/routes/_authenticated+/dms-prototype+/_workflow';
@@ -694,5 +698,174 @@ describe('Phase 10 — Signing Flow', () => {
     const reason = getParticipantBlockedReason('COMPLETED', 'COMPLETED');
     expect(reason).toBeTruthy();
     expect(reason).toContain('completed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 11 — Live Signing Flow
+// ---------------------------------------------------------------------------
+describe('Phase 11 — Live Signing Flow', () => {
+  it('updateParticipantStatus stores and retrieves status', () => {
+    const file = createFile();
+    const wf = createWorkflowForFile(file);
+    expect(wf.participantStatuses).toBeUndefined();
+
+    updateParticipantStatus(file.id, 'dms-user-reg-author-001', 'AVAILABLE');
+    const updated = getWorkflowForFile(file.id);
+    expect(updated?.participantStatuses?.['dms-user-reg-author-001']).toBe('AVAILABLE');
+  });
+
+  it('getParticipantStatusByStage returns correct stage participants', () => {
+    const file = createFile();
+    const wf = createWorkflowForFile(file);
+    updateParticipantStatus(file.id, 'dms-user-reg-author-001', 'COMPLETED');
+    updateParticipantStatus(file.id, 'dms-user-medical-001', 'AVAILABLE');
+
+    const stage1Statuses = getParticipantStatusByStage(file.id, 1);
+    expect(stage1Statuses).toHaveLength(1);
+    expect(stage1Statuses[0].status).toBe('COMPLETED');
+
+    const stage2Statuses = getParticipantStatusByStage(file.id, 2);
+    expect(stage2Statuses).toHaveLength(3);
+    expect(stage2Statuses.find((s) => s.participantId === 'dms-user-medical-001')?.status).toBe('AVAILABLE');
+  });
+});
+
+describe('Phase 11 — Evidence State', () => {
+  it('updateEvidenceState stores evidence reference', () => {
+    const file = createFile();
+    createWorkflowForFile(file);
+    updateEvidenceState(file.id, { evidenceReference: 'evt-ref-001', lastSyncedAt: '2026-07-09T00:00:00Z' });
+    const wf = getWorkflowForFile(file.id);
+    expect(wf?.evidenceReference).toBe('evt-ref-001');
+    expect(wf?.lastSyncedAt).toBe('2026-07-09T00:00:00Z');
+  });
+
+  it('updateEvidenceState stores artifact reference and finalSha256', () => {
+    const file = createFile();
+    createWorkflowForFile(file);
+    updateEvidenceState(file.id, {
+      artifactReference: 'art-ref-001',
+      finalSha256: 'abc123def456',
+      finalSignedPdfReference: 'signed-pdf-001',
+    });
+    const wf = getWorkflowForFile(file.id);
+    expect(wf?.artifactReference).toBe('art-ref-001');
+    expect(wf?.finalSha256).toBe('abc123def456');
+    expect(wf?.finalSignedPdfReference).toBe('signed-pdf-001');
+  });
+});
+
+describe('Phase 11 — Participant Actionability', () => {
+  it('COMPLETED participant status shows as blocked', () => {
+    const reason = getParticipantBlockedReason('IN_PROGRESS', 'COMPLETED');
+    expect(reason).toContain('completed');
+  });
+
+  it('BLOCKED participant shows blocked reason', () => {
+    const reason = getParticipantBlockedReason('IN_PROGRESS', 'BLOCKED');
+    expect(reason).toBeTruthy();
+    expect(reason).toContain('blocked');
+  });
+
+  it('AVAILABLE participant has no blocking reason', () => {
+    const reason = getParticipantBlockedReason('IN_PROGRESS', 'AVAILABLE');
+    expect(reason).toBeUndefined();
+  });
+
+  it('VIEWED participant has no blocking reason', () => {
+    const reason = getParticipantBlockedReason('IN_PROGRESS', 'VIEWED');
+    expect(reason).toBeUndefined();
+  });
+
+  it('no status returns undefined blocking reason', () => {
+    const reason = getParticipantBlockedReason('IN_PROGRESS', undefined);
+    expect(reason).toBeUndefined();
+  });
+});
+
+describe('Phase 11 — Audit Timeline Combined', () => {
+  const dmsEvent: AuditEntry = {
+    id: 'dms-signing-created',
+    timestamp: '2026-07-09T12:00:00Z',
+    type: 'SIGNING_REQUEST_CREATED',
+    description: 'Signing request created',
+    category: 'DMS',
+  };
+
+  const evidenceEvents: EvidenceEvent[] = [
+    {
+      id: 'e-req-created',
+      timestamp: '2026-07-09T12:15:00Z',
+      type: 'REQUEST_CREATED',
+      actorName: 'System',
+    },
+    {
+      id: 'e-req-sent',
+      timestamp: '2026-07-09T13:00:00Z',
+      type: 'REQUEST_SENT',
+      actorName: 'System',
+    },
+    {
+      id: 'e-signed',
+      timestamp: '2026-07-09T14:00:00Z',
+      type: 'PARTICIPANT_COMPLETED',
+      actorName: 'Regulatory Author',
+      actorEmail: 'regulatory.author@example.test',
+    },
+    {
+      id: 'e-artifact',
+      timestamp: '2026-07-09T15:00:00Z',
+      type: 'FINAL_ARTIFACT_CAPTURED',
+    },
+  ];
+
+  it('combines DMS and evidence events in descending order', () => {
+    const timeline = buildDmsAuditTimeline([dmsEvent], evidenceEvents);
+    expect(timeline).toHaveLength(5);
+    expect(timeline[0].id).toBe('sig-e-artifact');
+    expect(timeline[timeline.length - 1].id).toBe('dms-signing-created');
+  });
+
+  it('signing evidence is wrapped in sanitization', () => {
+    const eventsWithEmail: EvidenceEvent[] = [
+      ...evidenceEvents,
+      {
+        id: 'e-signed-email',
+        timestamp: '2026-07-09T14:30:00Z',
+        type: 'PARTICIPANT_COMPLETED',
+        actorEmail: 'regulatory.author@example.test',
+      },
+    ];
+    const timeline = buildDmsAuditTimeline([dmsEvent], eventsWithEmail);
+    const sanitized = sanitizeAuditEntries(timeline);
+    const emailEntry = sanitized.find((e) => e.id === 'sig-e-signed-email');
+    expect(emailEntry?.actor).toContain('***');
+    expect(emailEntry?.actor).not.toContain('example.test');
+  });
+});
+
+describe('Phase 11 — Session launch logic', () => {
+  it('external unverified participant has pending status', () => {
+    const identity = createParticipantIdentity('user-ext-consult-001');
+    expect(identity.verificationStatus).toBe('PENDING');
+  });
+
+  it('external verified participant has verified status', () => {
+    createParticipantIdentity('user-ext-consult-001');
+    const verified = verifyExternalParticipant('dms-user-ext-consult-001');
+    expect(verified?.verificationStatus).toBe('VERIFIED');
+  });
+
+  it('expired participant shows expired', () => {
+    createParticipantIdentity('user-ext-consult-001');
+    const expired = expireExternalParticipant('dms-user-ext-consult-001');
+    expect(expired?.verificationStatus).toBe('EXPIRED');
+  });
+
+  it('failed participant shows failed', () => {
+    createParticipantIdentity('user-ext-consult-001');
+    const failed = failExternalParticipant('dms-user-ext-consult-001');
+    expect(failed?.verificationStatus).toBe('FAILED');
   });
 });

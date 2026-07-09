@@ -93,6 +93,12 @@ export type DmsWorkflow = {
   frozenPdfReference?: string;
   sha256?: string;
   frozenAt?: string;
+  participantStatuses?: Record<string, string>;
+  evidenceReference?: string;
+  artifactReference?: string;
+  finalSha256?: string;
+  finalSignedPdfReference?: string;
+  lastSyncedAt?: string;
 };
 
 export type DmsAdminSetting = {

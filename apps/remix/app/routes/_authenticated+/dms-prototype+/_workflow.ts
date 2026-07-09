@@ -162,6 +162,71 @@ export function getWorkflowBySigningRequestId(signingRequestId: string): DmsWork
   return undefined;
 }
 
+export function updateParticipantStatus(fileId: string, participantId: string, status: string): DmsWorkflow {
+  const workflow = workflowStore.get(fileId);
+  if (!workflow) {
+    throw new Error(`No workflow for file ${fileId}`);
+  }
+
+  workflow.participantStatuses = {
+    ...(workflow.participantStatuses ?? {}),
+    [participantId]: status,
+  };
+  workflowStore.set(fileId, workflow);
+  return workflow;
+}
+
+export function updateEvidenceState(
+  fileId: string,
+  state: {
+    evidenceReference?: string;
+    artifactReference?: string;
+    finalSha256?: string;
+    finalSignedPdfReference?: string;
+    lastSyncedAt?: string;
+  },
+): DmsWorkflow {
+  const workflow = workflowStore.get(fileId);
+  if (!workflow) {
+    throw new Error(`No workflow for file ${fileId}`);
+  }
+
+  if (state.evidenceReference !== undefined) {
+    workflow.evidenceReference = state.evidenceReference;
+  }
+  if (state.artifactReference !== undefined) {
+    workflow.artifactReference = state.artifactReference;
+  }
+  if (state.finalSha256 !== undefined) {
+    workflow.finalSha256 = state.finalSha256;
+  }
+  if (state.finalSignedPdfReference !== undefined) {
+    workflow.finalSignedPdfReference = state.finalSignedPdfReference;
+  }
+  if (state.lastSyncedAt !== undefined) {
+    workflow.lastSyncedAt = state.lastSyncedAt;
+  }
+  workflowStore.set(fileId, workflow);
+  return workflow;
+}
+
+export function getParticipantStatusByStage(
+  fileId: string,
+  stageOrder: number,
+): Array<{ participantId: string; status: string }> {
+  const workflow = workflowStore.get(fileId);
+  if (!workflow || !workflow.participantStatuses) {
+    return [];
+  }
+
+  const stageParticipants = workflow.participants.filter((p) => p.stageOrder === stageOrder);
+
+  return stageParticipants.map((p) => ({
+    participantId: p.participantId,
+    status: workflow.participantStatuses?.[p.participantId] ?? 'WAITING',
+  }));
+}
+
 export function mapIntegrationStatusToDms(status: string): DmsDocumentStatus {
   switch (status) {
     case 'READY':
