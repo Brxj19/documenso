@@ -1,9 +1,9 @@
 # Integration API V1 Signing Requests
 
-Phase 5 keeps the reusable signing-tool facade behind
-`INTEGRATION_API_V1_ENABLED` and makes completed requests defensible after
-signing by adding normalized evidence, final-artifact capture, protected
-artifact retrieval, signed callbacks, and reconciliation commands.
+Phase 6 keeps the reusable signing-tool facade behind
+`INTEGRATION_API_V1_ENABLED` and adds request lifecycle controls including
+participant rejection, cancellation, expiry processing, rate-limited reminders,
+terminal-state enforcement, and immutable completed-request behavior.
 
 ## Endpoints
 
@@ -15,30 +15,160 @@ artifact retrieval, signed callbacks, and reconciliation commands.
 - `GET /api/v1/integration/signing-requests/:requestId/evidence`
 - `GET /api/v1/integration/signing-requests/:requestId/artifacts`
 - `GET /api/v1/integration/signing-requests/:requestId/artifacts/:artifactId/download`
+- `POST /api/v1/integration/signing-requests/:requestId/participants/:participantId/reject`
+- `POST /api/v1/integration/signing-requests/:requestId/cancel`
+- `POST /api/v1/integration/signing-requests/:requestId/participants/:participantId/remind`
 - `GET /sign/integration/:sessionId`
 - `GET /sign/integration/:sessionId/complete`
 - `GET /t/:teamUrl/integration/signing-requests/:requestId`
 
-## Normalized Evidence
+## Terminal-State Policy
 
-Phase 5 adds append-only integration events keyed to the signing request and
-deduped by a server-generated normalization key. Current event types include:
+Terminal request statuses are `COMPLETED`, `REJECTED`, `CANCELLED`, `EXPIRED`,
+and `FAILED`.
 
-- `REQUEST_CREATED`
-- `REQUEST_SENT`
-- `SIGNING_SESSION_CREATED`
-- `SIGNING_SESSION_LAUNCHED`
-- `PARTICIPANT_COMPLETED`
+Rules:
+
+1. Terminal requests cannot be sent or activated again.
+2. Terminal requests cannot create signing sessions.
+3. Terminal requests cannot send reminders.
+4. Terminal requests cannot add or change participants.
+5. Terminal requests cannot return to `READY`, `IN_PROGRESS`, or
+   `PARTIALLY_COMPLETED`.
+6. Terminal requests can still expose evidence, artifact metadata, download if
+   completed, event timeline, callback state, and reconciliation history.
+7. A changed source document or new version must create a new integration
+   signing request.
+
+## Rejection
+
+`POST /api/v1/integration/signing-requests/:requestId/participants/:participantId/reject`
+
+Request body:
+- `reason` (required string, trimmed, bounded to 255 characters)
+
+Response includes the normalized request and participant status. A rejected
+request transitions to `REJECTED`. Later participant sessions become invalid.
+
+Evidence records `PARTICIPANT_REJECTED` and `REQUEST_REJECTED` events. A
+callback is queued when callback configuration exists.
+
+## Cancellation
+
+`POST /api/v1/integration/signing-requests/:requestId/cancel`
+
+Request body:
+- `reason` (required string, trimmed, bounded to 255 characters)
+
+The caller must be authenticated and authorized under existing team ownership
+conventions. The request must be non-terminal. A completed request cannot be
+cancelled.
+
+Evidence records a `REQUEST_CANCELLED` event. A callback is queued when
+callback configuration exists.
+
+## Expiry
+
+Expiry is processor-driven. The command:
+
+```bash
+npm run integration:expire
+```
+
+Scans non-terminal integration requests with `expiresAt` in the past, marks
+them `EXPIRED`, appends an `REQUEST_EXPIRED` event idempotently, and enqueues
+callbacks when configured.
+
+Optional dry-run:
+```bash
+npm run integration:expire -- --dry-run
+```
+
+## Reminders
+
+`POST /api/v1/integration/signing-requests/:requestId/participants/:participantId/remind`
+
+Rate-limited by:
+- `INTEGRATION_API_V1_REMINDER_MIN_INTERVAL_SECONDS` (default 3600)
+- `INTEGRATION_API_V1_REMINDER_MAX_PER_DAY` (default 5)
+- `INTEGRATION_API_V1_REMINDER_MAX_PER_REQUEST` (default 15)
+- `INTEGRATION_API_V1_REMINDER_ENABLED` (required to enable)
+
+Rate-limited attempts are recorded as `REMINDER_ATTEMPTED` events and visible
+in evidence. Successful reminders record `REMINDER_SENT`.
+
+## Immutable Completed Requests
+
+Completed requests reject all mutation attempts:
+- send/activate
+- signing-session creation
+- reminder/resend
+- reject
+- cancel
+- expire
+
+Completed artifact download and evidence remain available.
+
+## Lifecycle Event Types
+
+Phase 6 adds to the normalized event model:
+
+- `REQUEST_CANCELLED`
+- `REQUEST_EXPIRED`
+- `REMINDER_SENT`
+- `REMINDER_ATTEMPTED`
+
+## Callback Behavior For Lifecycle Events
+
+The following lifecycle events are callback-eligible and enqueue a signed
+callback when callback URL configuration exists:
+
 - `PARTICIPANT_REJECTED`
-- `REQUEST_PARTIALLY_COMPLETED`
-- `REQUEST_COMPLETED`
 - `REQUEST_REJECTED`
-- `REQUEST_FAILED`
-- `FINAL_ARTIFACT_CAPTURED`
-- `CALLBACK_QUEUED`
-- `CALLBACK_DELIVERED`
-- `CALLBACK_FAILED`
-- `RECONCILIATION_REFRESHED`
+- `REQUEST_CANCELLED`
+- `REQUEST_EXPIRED`
+- `REMINDER_SENT`
+
+Duplicate lifecycle events do not enqueue duplicate callbacks. Callback
+failure and retry are visible in evidence.
+
+## Evidence Visibility
+
+Rejected, cancelled, and expired requests remain fully auditable. The evidence
+endpoint shows the terminal status, reason via event metadata, and the full
+event timeline including all lifecycle events.
+
+## Changed Document Or Version Rule
+
+If the source file content changes, source file version changes, or a rejected
+request requires document edits, create a new signing request. The previous
+request remains auditable in its terminal state.
+
+## Capabilities
+
+`GET /api/v1/integration/capabilities` now reports:
+
+- `releasePhase: PHASE_6_LIFECYCLE_CONTROLS`
+- `rejectionSupported: true`
+- `cancellationSupported: true`
+- `expiryProcessorSupported: true`
+- `remindersSupported: true`
+- `reminderRateLimitsSupported: true`
+- `terminalStateEnforcementSupported: true`
+- `immutableCompletedRequestsSupported: true`
+
+## Out Of Scope
+
+Phase 6 still does not add:
+
+- a custom signing engine
+- embedded signing
+- public artifact URLs
+- private key exposure
+- manual audit editing
+- multi-document package support
+- external SaaS signing providers
+- domain-specific or customer-specific vocabulary
 
 Each event stores only safe references:
 

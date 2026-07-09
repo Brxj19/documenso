@@ -211,6 +211,75 @@ npm run with:env -- \
   npx vitest run packages/api/v1/integration/evidence.test.ts
 ```
 
+## Phase 6 Lifecycle Controls
+
+### Rejection
+
+To test participant rejection locally:
+
+```bash
+# Create and send a request first, then:
+curl -X POST http://localhost:3000/api/v1/integration/signing-requests/<requestId>/participants/<participantId>/reject \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"reason": "Document has errors"}'
+```
+
+### Cancellation
+
+```bash
+curl -X POST http://localhost:3000/api/v1/integration/signing-requests/<requestId>/cancel \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"reason": "No longer needed"}'
+```
+
+### Expiry Processor
+
+Manually trigger the expiry scan:
+
+```bash
+npm run integration:expire
+```
+
+Dry-run without mutating:
+
+```bash
+npm run integration:expire -- --dry-run
+```
+
+This command should be scheduled (e.g., cron) in production. It scans
+non-terminal integration requests with past-due `expiresAt` values and
+transitions them to `EXPIRED`.
+
+### Reminders
+
+Reminder behavior is configured through environment variables:
+
+- `INTEGRATION_API_V1_REMINDER_ENABLED=true` (required)
+- `INTEGRATION_API_V1_REMINDER_MIN_INTERVAL_SECONDS=3600` (default 1 hour)
+- `INTEGRATION_API_V1_REMINDER_MAX_PER_DAY=5`
+- `INTEGRATION_API_V1_REMINDER_MAX_PER_REQUEST=15`
+
+```bash
+curl -X POST http://localhost:3000/api/v1/integration/signing-requests/<requestId>/participants/<participantId>/remind \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json'
+```
+
+### Terminal-State Behavior
+
+Completed, rejected, cancelled, expired, and failed requests are terminal.
+The integration layer blocks mutation attempts (send, session creation,
+reminder, cancel, reject) on terminal requests. Only evidence, artifact
+download (if completed), and status read operations remain available.
+
+Run the lifecycle tests:
+
+```bash
+npm run with:env -- npx vitest run packages/api/v1/integration/lifecycle.test.ts
+```
+
 ## Cleanup
 
 ```bash

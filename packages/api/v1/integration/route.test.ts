@@ -15,7 +15,10 @@ import {
   INTEGRATION_API_V1_CAPABILITIES_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUEST_ARTIFACT_DOWNLOAD_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUEST_ARTIFACTS_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUEST_CANCEL_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUEST_EVIDENCE_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUEST_REJECT_PARTICIPANT_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUEST_REMIND_PARTICIPANT_ROUTE,
   INTEGRATION_API_V1_SIGNING_SESSION_ROUTE,
 } from './route';
 
@@ -44,6 +47,15 @@ describe('integration api v1 route', () => {
     );
     expect(INTEGRATION_API_V1_SIGNING_SESSION_ROUTE).toBe(
       '/api/v1/integration/signing-requests/:requestId/participants/:participantId/signing-session',
+    );
+    expect(INTEGRATION_API_V1_SIGNING_REQUEST_REJECT_PARTICIPANT_ROUTE).toBe(
+      '/api/v1/integration/signing-requests/:requestId/participants/:participantId/reject',
+    );
+    expect(INTEGRATION_API_V1_SIGNING_REQUEST_CANCEL_ROUTE).toBe(
+      '/api/v1/integration/signing-requests/:requestId/cancel',
+    );
+    expect(INTEGRATION_API_V1_SIGNING_REQUEST_REMIND_PARTICIPANT_ROUTE).toBe(
+      '/api/v1/integration/signing-requests/:requestId/participants/:participantId/remind',
     );
   });
 
@@ -84,7 +96,14 @@ describe('integration api v1 route', () => {
         maximum: 1,
         multipleDocuments: false,
       },
-      releasePhase: 'PHASE_5_AUDIT_EVIDENCE_CALLBACKS',
+      rejectionSupported: true,
+      cancellationSupported: true,
+      expiryProcessorSupported: true,
+      remindersSupported: true,
+      reminderRateLimitsSupported: true,
+      terminalStateEnforcementSupported: true,
+      immutableCompletedRequestsSupported: true,
+      releasePhase: 'PHASE_6_LIFECYCLE_CONTROLS',
     });
   });
 

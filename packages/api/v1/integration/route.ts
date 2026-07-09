@@ -19,6 +19,11 @@ export const INTEGRATION_API_V1_SIGNING_REQUEST_ARTIFACT_DOWNLOAD_ROUTE =
   '/api/v1/integration/signing-requests/:requestId/artifacts/:artifactId/download';
 export const INTEGRATION_API_V1_SIGNING_SESSION_ROUTE =
   '/api/v1/integration/signing-requests/:requestId/participants/:participantId/signing-session';
+export const INTEGRATION_API_V1_SIGNING_REQUEST_REJECT_PARTICIPANT_ROUTE =
+  '/api/v1/integration/signing-requests/:requestId/participants/:participantId/reject';
+export const INTEGRATION_API_V1_SIGNING_REQUEST_CANCEL_ROUTE = '/api/v1/integration/signing-requests/:requestId/cancel';
+export const INTEGRATION_API_V1_SIGNING_REQUEST_REMIND_PARTICIPANT_ROUTE =
+  '/api/v1/integration/signing-requests/:requestId/participants/:participantId/remind';
 
 export const getIntegrationApiV1Capabilities = (): TIntegrationApiV1CapabilitySchema =>
   ZIntegrationApiV1CapabilitySchema.parse({
@@ -46,7 +51,14 @@ export const getIntegrationApiV1Capabilities = (): TIntegrationApiV1CapabilitySc
       maximum: 1,
       multipleDocuments: false,
     },
-    releasePhase: 'PHASE_5_AUDIT_EVIDENCE_CALLBACKS',
+    rejectionSupported: true,
+    cancellationSupported: true,
+    expiryProcessorSupported: true,
+    remindersSupported: true,
+    reminderRateLimitsSupported: true,
+    terminalStateEnforcementSupported: true,
+    immutableCompletedRequestsSupported: true,
+    releasePhase: 'PHASE_6_LIFECYCLE_CONTROLS',
   });
 
 export const getIntegrationApiV1HealthResponse = (): TIntegrationApiV1HealthResponseSchema =>

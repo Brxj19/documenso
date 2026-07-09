@@ -106,7 +106,14 @@ describe('integration api v1 schemas', () => {
         maximum: 1,
         multipleDocuments: false,
       },
-      releasePhase: 'PHASE_5_AUDIT_EVIDENCE_CALLBACKS',
+      rejectionSupported: true,
+      cancellationSupported: true,
+      expiryProcessorSupported: true,
+      remindersSupported: true,
+      reminderRateLimitsSupported: true,
+      terminalStateEnforcementSupported: true,
+      immutableCompletedRequestsSupported: true,
+      releasePhase: 'PHASE_6_LIFECYCLE_CONTROLS',
     });
 
     const signingSessionRequestResult = ZIntegrationApiV1CreateSigningSessionSchema.safeParse({

@@ -918,6 +918,10 @@ msgstr "404 Organisatie niet gevonden"
 msgid "404 Profile not found"
 msgstr "404 Profiel niet gevonden"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "404 Signing request not found"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/_layout.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/teams.$id.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/teams.$id.tsx
@@ -1189,6 +1193,11 @@ msgstr "Kennisgeving"
 msgid "Action"
 msgstr "Actie"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Actionable:"
+msgstr ""
+
 #: apps/remix/app/components/general/document-signing/document-signing-page-view-v2.tsx
 #: apps/remix/app/components/general/envelope-signing/envelope-signer-header.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
@@ -1224,6 +1233,7 @@ msgstr "Acties"
 #: apps/remix/app/routes/_authenticated+/admin+/email-domains._index.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/email-domains.$id.tsx
 #: apps/remix/app/routes/_authenticated+/o.$orgUrl.settings.members.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings._index.tsx
 msgid "Active"
 msgstr "Actief"
@@ -1416,8 +1426,8 @@ msgid "Add Placeholders"
 msgstr "Placeholders toevoegen"
 
 #: apps/remix/app/components/general/rate-limit-array-input.tsx
-msgid "Add rate limit"
-msgstr "Snelheidslimiet toevoegen"
+msgid "Add rate limit window"
+msgstr ""
 
 #: apps/remix/app/components/dialogs/ai-recipient-detection-dialog.tsx
 msgid "Add recipients"
@@ -2008,7 +2018,9 @@ msgstr "Elke bron"
 msgid "Any Status"
 msgstr "Elke status"
 
+#: apps/remix/app/components/general/claim-limit-fields.tsx
 #: apps/remix/app/components/tables/admin-organisation-stats-table.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 msgid "API"
 msgstr "API"
 
@@ -2016,10 +2028,6 @@ msgstr "API"
 #: apps/remix/app/components/forms/email-transport-form.tsx
 msgid "API key"
 msgstr "API-sleutel"
-
-#: apps/remix/app/components/general/claim-limit-fields.tsx
-msgid "API rate limits"
-msgstr "API-snelheidslimieten"
 
 #: apps/remix/app/components/general/organisation-usage-panel.tsx
 msgid "API requests"
@@ -2165,6 +2173,10 @@ msgstr "Weet je zeker dat je dit team wilt verwijderen?"
 msgid "Are you sure?"
 msgstr "Weet je het zeker?"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Artifact status"
+msgstr ""
+
 #: apps/remix/app/components/tables/organisation-groups-table.tsx
 msgid "Assigned Teams"
 msgstr "Toegewezen teams"
@@ -2253,6 +2265,10 @@ msgstr "Bijlagen"
 msgid "Attempts sealing the document again, useful for after a code change has occurred to resolve an erroneous document."
 msgstr "Probeert het document opnieuw te verzegelen, handig nadat een codewijziging is gedaan om een foutief document op te lossen."
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Attempts:"
+msgstr ""
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/audit-log.tsx
 #: packages/lib/server-only/pdf/render-audit-logs.ts
 msgid "Audit Log"
@@ -2288,6 +2304,10 @@ msgstr "Authenticator-app"
 #: apps/remix/app/components/general/document-signing/document-signing-auto-sign.tsx
 msgid "Automatically sign fields"
 msgstr "Velden automatisch ondertekenen"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Available"
+msgstr ""
 
 #: apps/remix/app/components/forms/avatar-image.tsx
 msgid "Avatar"
@@ -2378,12 +2398,19 @@ msgid "Block signups from additional email domains on top of the bundled disposa
 msgstr "Blokkeer registraties van extra e‑maildomeinen boven op de meegeleverde lijst met tijdelijke e‑mailadressen. Subdomeinen worden automatisch herkend (bijv. het blokkeren van \"bad.com\" blokkeert ook \"foo.bad.com\")."
 
 #: apps/remix/app/components/general/organisation-usage-panel.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 msgid "Blocked"
 msgstr "Geblokkeerd"
 
 #: apps/remix/app/components/general/admin-email-blocklist-section.tsx
 msgid "Blocked Domains"
 msgstr "Geblokkeerde domeinen"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Blocked reason:"
+msgstr ""
 
 #: packages/ui/primitives/signature-pad/signature-pad-color-picker.tsx
 msgid "Blue"
@@ -2528,6 +2555,18 @@ msgstr "Door verder te gaan ga je akkoord met onze <0>Servicevoorwaarden</0> en 
 msgid "By using the electronic signature feature, you are consenting to conduct transactions and receive disclosures electronically. You acknowledge that your electronic signature on documents is binding and that you accept the terms outlined in the documents you are signing."
 msgstr "Door de functie voor elektronische handtekeningen te gebruiken, stem je ermee in transacties uit te voeren en kennisgevingen elektronisch te ontvangen. Je erkent dat je elektronische handtekening onder documenten bindend is en dat je de voorwaarden van de te ondertekenen documenten accepteert."
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Callback"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Callback deliveries"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Callback Deliveries"
+msgstr ""
+
 #: packages/ui/components/recipient/recipient-role-select.tsx
 msgid "Can prepare"
 msgstr "Kan voorbereiden"
@@ -2660,6 +2699,9 @@ msgstr "Documenten annuleren"
 
 #: apps/remix/app/components/general/document/document-status.tsx
 #: apps/remix/app/components/general/envelope-editor/envelope-editor-header.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 #: packages/lib/constants/document.ts
 msgid "Cancelled"
 msgstr "Geannuleerd"
@@ -2680,6 +2722,14 @@ msgstr "Ondertekenaar kan niet worden verwijderd"
 #: apps/remix/app/components/general/envelope-editor/envelope-editor-upload-page.tsx
 msgid "Cannot upload items after the document has been sent"
 msgstr "Items kunnen niet worden geüpload nadat het document is verzonden"
+
+#: apps/remix/app/routes/_authenticated+/admin+/organisations.$id.tsx
+msgid "Capabilities enabled for this organisation."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Captured at"
+msgstr ""
 
 #: packages/lib/constants/recipient-roles.ts
 msgctxt "Recipient role name"
@@ -2709,6 +2759,10 @@ msgstr "Ccers"
 #: apps/remix/app/components/forms/editor/editor-field-generic-field-forms.tsx
 msgid "Center"
 msgstr "Centreren"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Certificate evidence"
+msgstr ""
 
 #: apps/remix/app/components/general/envelope-editor/envelope-editor-fields-page-renderer.tsx
 msgid "Change Field Type"
@@ -2851,6 +2905,10 @@ msgstr "Klik om de ondertekeningslink te kopiëren om naar de ontvanger te sture
 msgid "Click to insert field"
 msgstr "Klik om veld in te voegen"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Client correlation"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/o.$orgUrl.settings.sso.tsx
 msgid "Client ID"
 msgstr "Client-ID"
@@ -2938,6 +2996,9 @@ msgstr "Vul de velden in voor de volgende ondertekenaars."
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 #: apps/remix/app/components/tables/admin-document-jobs-table.tsx
 #: apps/remix/app/components/tables/organisation-insights-table.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 #: packages/email/template-components/template-document-completed.tsx
 #: packages/email/template-components/template-document-recipient-signed.tsx
 #: packages/email/template-components/template-document-self-signed.tsx
@@ -2948,6 +3009,12 @@ msgstr "Voltooid"
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 msgid "Completed At"
 msgstr "Voltooid op"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Completed at:"
+msgstr ""
 
 #: packages/email/templates/document-completed.tsx
 #: packages/email/templates/document-self-signed.tsx
@@ -2966,6 +3033,10 @@ msgstr "Voltooide documenten"
 #: apps/remix/app/components/general/document/document-certificate-qr-view.tsx
 msgid "Completed on {formattedDate}"
 msgstr "Voltooid op {formattedDate}"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Completion policy:"
+msgstr ""
 
 #: packages/lib/constants/pdf-viewer-i18n.ts
 #: packages/lib/constants/pdf-viewer-i18n.ts
@@ -3271,6 +3342,10 @@ msgstr "Token kopiëren"
 msgid "Copy Value"
 msgstr "Waarde kopiëren"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Correlation ID"
+msgstr ""
+
 #: apps/remix/app/components/general/organisation-usage-reset-button.tsx
 msgid "Counter reset."
 msgstr "Teller opnieuw ingesteld."
@@ -3509,6 +3584,10 @@ msgstr "Maak je account aan en begin met het gebruik van moderne documentenonder
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.webhooks._index.tsx
 msgid "Created"
 msgstr "Aangemaakt"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Created at"
+msgstr ""
 
 #: apps/remix/app/components/tables/admin-organisations-table.tsx
 #: apps/remix/app/components/tables/admin-user-teams-table.tsx
@@ -3930,6 +4009,14 @@ msgstr "Account wordt verwijderd..."
 msgid "Deletion scheduled"
 msgstr "Verwijdering gepland"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Delivered"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Delivering"
+msgstr ""
+
 #: apps/remix/app/components/general/webhook-logs-sheet.tsx
 msgid "Destination"
 msgstr "Bestemming"
@@ -4340,6 +4427,7 @@ msgstr "Document verborgen"
 
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/documents.$id.logs.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 msgid "Document ID"
 msgstr "Document‑ID"
 
@@ -4406,10 +4494,6 @@ msgstr "Documentvoorkeuren"
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.document.tsx
 msgid "Document preferences updated"
 msgstr "Documentvoorkeuren bijgewerkt"
-
-#: apps/remix/app/components/general/claim-limit-fields.tsx
-msgid "Document rate limits"
-msgstr "Documentsnelheidslimieten"
 
 #: apps/remix/app/components/general/document-signing/document-signing-reject-dialog.tsx
 #: apps/remix/app/components/general/document/document-status.tsx
@@ -4546,6 +4630,7 @@ msgstr "Documentatie"
 #: apps/remix/app/components/general/app-command-menu.tsx
 #: apps/remix/app/components/general/app-nav-desktop.tsx
 #: apps/remix/app/components/general/app-nav-mobile.tsx
+#: apps/remix/app/components/general/claim-limit-fields.tsx
 #: apps/remix/app/components/general/envelope-editor/envelope-editor-upload-page.tsx
 #: apps/remix/app/components/general/organisation-usage-panel.tsx
 #: apps/remix/app/components/general/skeletons/document-edit-skeleton.tsx
@@ -4696,6 +4781,7 @@ msgstr "Sjabloon-CSV downloaden"
 #: apps/remix/app/components/general/document/document-status.tsx
 #: apps/remix/app/components/general/envelope-editor/envelope-editor-header.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 #: packages/lib/constants/document.ts
 msgid "Draft"
 msgstr "Concept"
@@ -4995,10 +5081,6 @@ msgstr "E-mailvoorkeuren"
 msgid "Email preferences updated"
 msgstr "E-mailvoorkeuren bijgewerkt"
 
-#: apps/remix/app/components/general/claim-limit-fields.tsx
-msgid "Email rate limits"
-msgstr "E-mailsnelheidslimieten"
-
 #: packages/ui/components/document/document-email-checkboxes.tsx
 msgid "Email recipients when a pending document is deleted"
 msgstr "E-mail ontvangers wanneer een in behandeling zijnd document wordt verwijderd"
@@ -5094,6 +5176,7 @@ msgstr "E‑mailverificatie is verwijderd"
 msgid "Email verification has been resent"
 msgstr "E‑mailverificatie is opnieuw verzonden"
 
+#: apps/remix/app/components/general/claim-limit-fields.tsx
 #: apps/remix/app/components/general/organisation-usage-panel.tsx
 #: apps/remix/app/components/tables/admin-organisation-stats-table.tsx
 #: apps/remix/app/components/tables/organisation-email-domains-table.tsx
@@ -5107,15 +5190,13 @@ msgstr "E-mails"
 msgid "Embedding, 5 members included and more"
 msgstr "Inbedding, 5 leden inbegrepen en meer"
 
-#: apps/remix/app/components/general/claim-limit-fields.tsx
-#: apps/remix/app/components/general/claim-limit-fields.tsx
-#: apps/remix/app/components/general/claim-limit-fields.tsx
-msgid "Empty = Unlimited, 0 = Blocked"
-msgstr "Leeg = Onbeperkt, 0 = Geblokkeerd"
-
 #: packages/ui/primitives/document-flow/add-fields.tsx
 msgid "Empty field"
 msgstr "Leeg veld"
+
+#: apps/remix/app/components/general/claim-limit-fields.tsx
+msgid "Empty quota means unlimited, 0 blocks the resource. Rate limit windows accept values like 5m, 1h or 24h."
+msgstr ""
 
 #: apps/remix/app/components/dialogs/team-inherit-member-enable-dialog.tsx
 msgid "Enable"
@@ -5220,6 +5301,10 @@ msgstr "Bijgevoegde documenten"
 msgid "Endpoint (optional)"
 msgstr "Endpoint (optioneel)"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Engine Completion"
+msgstr ""
+
 #: packages/lib/constants/i18n.ts
 msgid "English"
 msgstr "Engels"
@@ -5236,6 +5321,10 @@ msgstr "Zorg ervoor dat je het embedding-token gebruikt en niet het API-token"
 msgid "Enter"
 msgstr "Invoeren"
 
+#: apps/remix/app/components/general/rate-limit-array-input.tsx
+msgid "Enter a max request count greater than 0"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/folder-create-dialog.tsx
 msgid "Enter a name for your new folder. Folders help you organise your items."
 msgstr "Voer een naam in voor je nieuwe map. Mappen helpen je je items te organiseren."
@@ -5243,6 +5332,10 @@ msgstr "Voer een naam in voor je nieuwe map. Mappen helpen je je items te organi
 #: apps/remix/app/components/dialogs/envelope-rename-dialog.tsx
 msgid "Enter a new title"
 msgstr "Voer een nieuwe titel in"
+
+#: apps/remix/app/components/general/rate-limit-array-input.tsx
+msgid "Enter a window, e.g. 5m"
+msgstr ""
 
 #: apps/remix/app/components/forms/subscription-claim-form.tsx
 msgid "Enter claim name"
@@ -5330,6 +5423,7 @@ msgstr "Enterprise"
 msgid "Envelope distributed"
 msgstr "Envelope gedistribueerd"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/audit-log.tsx
 #: packages/lib/server-only/pdf/render-audit-logs.ts
 #: packages/lib/server-only/pdf/render-audit-logs.ts
@@ -5480,6 +5574,10 @@ msgstr "Fout bij uploaden van bestand"
 msgid "Event"
 msgstr "Gebeurtenis"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Event Timeline"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/webhook-test-dialog.tsx
 msgid "Event Type"
 msgstr "Gebeurtenistype"
@@ -5502,6 +5600,14 @@ msgstr "Iedereen heeft getekend"
 msgid "Everyone has signed! You will receive an email copy of the signed document."
 msgstr "Iedereen heeft ondertekend! U ontvangt een kopie van het ondertekende document per e-mail."
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Evidence Summary"
+msgstr ""
+
+#: apps/remix/app/components/general/organisation-usage-panel.tsx
+msgid "Exceeded"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
 msgid "Exceeded timeout"
 msgstr "Time‑out overschreden"
@@ -5515,6 +5621,9 @@ msgid "Expiration"
 msgstr "Vervaldatum"
 
 #: apps/remix/app/components/general/document/document-page-view-recipients.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings._index.tsx
 msgid "Expired"
 msgstr "Verlopen"
@@ -5533,6 +5642,10 @@ msgstr "Verloopt"
 msgid "Expires {0}"
 msgstr "Verloopt op {0}"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Expires at"
+msgstr ""
+
 #. placeholder {0}: DateTime.fromMillis(Math.max(millisecondsRemaining, 0)).toFormat('mm:ss')
 #: apps/remix/app/components/general/document-signing/access-auth-2fa-form.tsx
 msgid "Expires in {0}"
@@ -5549,11 +5662,19 @@ msgstr "Verloopt op {0}"
 msgid "External ID"
 msgstr "Externe ID"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "External reference:"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/ai-recipient-detection-dialog.tsx
 msgid "Extracting contact details"
 msgstr "Contactgegevens extraheren"
 
 #: apps/remix/app/components/general/webhook-logs-sheet.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.webhooks.$id._index.tsx
 msgid "Failed"
 msgstr "Mislukt"
@@ -5785,6 +5906,10 @@ msgstr "Bestand is te klein"
 msgid "File size exceeds the limit of {APP_DOCUMENT_UPLOAD_SIZE_LIMIT} MB"
 msgstr "Bestandsgrootte overschrijdt de limiet van {APP_DOCUMENT_UPLOAD_SIZE_LIMIT} MB"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Filename"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/email-transport-create-dialog.tsx
 msgid "Fill in the details to create a new email transport."
 msgstr "Vul de details in om een nieuw e-mailtransport aan te maken."
@@ -5796,6 +5921,14 @@ msgstr "Vul de gegevens in om een nieuwe abonnementsclaim aan te maken."
 #: apps/remix/app/routes/_authenticated+/admin+/email-domains._index.tsx
 msgid "Filter by status"
 msgstr "Filteren op status"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Final Artifact"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Final SHA-256"
+msgstr ""
 
 #: apps/remix/app/components/forms/branding-preferences-form.tsx
 msgid "Focus ring colour."
@@ -6070,6 +6203,14 @@ msgstr "Groepsnaam"
 msgid "Groups"
 msgstr "Groepen"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Hash Mismatch"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Hash Verified"
+msgstr ""
+
 #: apps/remix/app/components/general/envelope-editor/envelope-editor-recipient-form.tsx
 #: apps/remix/app/components/general/envelope-editor/envelope-editor-recipient-form.tsx
 #: apps/remix/app/components/general/envelope-editor/envelope-editor-recipient-form.tsx
@@ -6302,6 +6443,10 @@ msgstr "Als je authenticator‑app geen QR‑codes ondersteunt, kun je in plaats
 msgid "Important: What This Means"
 msgstr "Belangrijk: wat dit betekent"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "In Progress"
+msgstr ""
+
 #: apps/remix/app/components/tables/user-billing-organisations-table.tsx
 #: packages/lib/constants/billing.ts
 msgctxt "Subscription status"
@@ -6419,6 +6564,10 @@ msgstr "Ingevoegd"
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Instance Stats"
 msgstr "Instantiestatistieken"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Integrity"
+msgstr ""
 
 #: apps/remix/app/components/forms/2fa/view-recovery-codes-dialog.tsx
 msgid "Invalid code. Please try again."
@@ -6653,10 +6802,18 @@ msgstr "Afgelopen 90 dagen"
 msgid "Last Active"
 msgstr "Laatst actief"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Last HTTP status:"
+msgstr ""
+
 #: apps/remix/app/components/general/document/document-page-view-information.tsx
 #: apps/remix/app/components/general/template/template-page-view-information.tsx
 msgid "Last modified"
 msgstr "Laatst gewijzigd"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Last reconciled"
+msgstr ""
 
 #: apps/remix/app/components/tables/admin-document-jobs-table.tsx
 msgid "Last Retried"
@@ -6764,6 +6921,10 @@ msgstr "Lichte modus"
 #: apps/remix/app/routes/_profile+/_layout.tsx
 msgid "Like to have your own public profile with agreements?"
 msgstr "Wil je een eigen openbaar profiel met overeenkomsten?"
+
+#: apps/remix/app/components/general/organisation-usage-panel.tsx
+msgid "Limit reached"
+msgstr ""
 
 #: apps/remix/app/components/general/claim-limit-fields.tsx
 msgid "Limits"
@@ -7070,6 +7231,10 @@ msgstr "MAU (ingelogd)"
 msgid "Max"
 msgstr "Max"
 
+#: apps/remix/app/components/general/rate-limit-array-input.tsx
+msgid "Max requests"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/template-bulk-send-dialog.tsx
 msgid "Maximum file size: 4MB. Maximum 100 rows per upload. Blank values will use template defaults."
 msgstr "Maximale bestandsgrootte: 4 MB. Maximaal 100 rijen per upload. Lege waarden gebruiken de standaardwaarden van de sjabloon."
@@ -7116,12 +7281,12 @@ msgstr "Lid sinds"
 
 #: apps/remix/app/components/dialogs/organisation-group-create-dialog.tsx
 #: apps/remix/app/components/dialogs/team-member-create-dialog.tsx
+#: apps/remix/app/components/general/organisation-usage-panel.tsx
 #: apps/remix/app/components/tables/admin-organisation-overview-table.tsx
 #: apps/remix/app/components/tables/organisation-groups-table.tsx
 #: apps/remix/app/components/tables/organisation-insights-table.tsx
 #: apps/remix/app/components/tables/organisation-insights-table.tsx
 #: apps/remix/app/components/tables/team-groups-table.tsx
-#: apps/remix/app/routes/_authenticated+/admin+/organisations.$id.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/teams.$id.tsx
 #: apps/remix/app/routes/_authenticated+/o.$orgUrl._index.tsx
 #: apps/remix/app/routes/_authenticated+/o.$orgUrl.settings._layout.tsx
@@ -7190,16 +7355,12 @@ msgid "Monthly Active Users: Users that had at least one of their documents comp
 msgstr "Maandelijks actieve gebruikers: gebruikers van wie ten minste één document is voltooid"
 
 #: apps/remix/app/components/general/claim-limit-fields.tsx
-msgid "Monthly API quota"
-msgstr "Maandelijkse API-limiet"
+msgid "Monthly quota"
+msgstr ""
 
-#: apps/remix/app/components/general/claim-limit-fields.tsx
-msgid "Monthly document quota"
-msgstr "Maandelijkse documentlimiet"
-
-#: apps/remix/app/components/general/claim-limit-fields.tsx
-msgid "Monthly email quota"
-msgstr "Maandelijkse e-maillimiet"
+#: apps/remix/app/components/general/organisation-usage-panel.tsx
+msgid "Monthly usage"
+msgstr ""
 
 #: apps/remix/app/components/dialogs/envelopes-bulk-move-dialog.tsx
 #: apps/remix/app/components/dialogs/folder-move-dialog.tsx
@@ -7290,13 +7451,33 @@ msgid "Name"
 msgstr "Naam"
 
 #: apps/remix/app/components/dialogs/sign-field-name-dialog.tsx
-#: apps/remix/app/routes/_authenticated+/o.$orgUrl.settings.groups.$id.tsx
 msgid "Name is required"
 msgstr "Naam is verplicht"
 
 #: apps/remix/app/components/general/envelope-editor/envelope-editor-fields-page.tsx
 msgid "Name Settings"
 msgstr "Naam-instellingen"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Native Mapping"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Native order:"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Native signing order:"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Native status"
+msgstr ""
+
+#: apps/remix/app/components/general/organisation-usage-panel.tsx
+msgid "Near limit"
+msgstr ""
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
 msgid "Need to sign documents?"
@@ -7352,6 +7533,10 @@ msgstr "Nieuw wachtwoord"
 msgid "Next"
 msgstr "Volgende"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Next attempt:"
+msgstr ""
+
 #: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
 msgid "Next Field"
 msgstr "Volgend veld"
@@ -7375,6 +7560,10 @@ msgstr "Nee"
 #: apps/remix/app/components/tables/documents-table-empty-state.tsx
 msgid "No active drafts"
 msgstr "Geen actieve concepten"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "No callback deliveries are queued for this request."
+msgstr ""
 
 #: apps/remix/app/components/general/pdf-viewer/envelope-pdf-viewer.tsx
 #: apps/remix/app/components/general/pdf-viewer/pdf-viewer.tsx
@@ -7436,6 +7625,10 @@ msgstr "Er is op dit moment geen verdere actie van jou vereist."
 #: apps/remix/app/components/general/organisation-groups-multiselect-combobox.tsx
 msgid "No groups found"
 msgstr "Geen groepen gevonden"
+
+#: apps/remix/app/routes/_authenticated+/admin+/organisations.$id.tsx
+msgid "No inherited claim"
+msgstr ""
 
 #: apps/remix/app/components/general/admin-license-card.tsx
 msgid "No License Configured"
@@ -7577,6 +7770,10 @@ msgstr "Geen"
 msgid "None (Overrides global settings)"
 msgstr "Geen (Overschrijft globale instellingen)"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Normalized events"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/documents.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/documents.$id.edit.tsx
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/templates.$id._index.tsx
@@ -7640,6 +7837,14 @@ msgstr "Aantal toegestane teams. 0 = onbeperkt"
 #: apps/remix/app/components/general/envelope-editor/envelope-editor-fields-page.tsx
 msgid "Number Settings"
 msgstr "Nummer-instellingen"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Observed:"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Occurred:"
+msgstr ""
 
 #: apps/remix/app/components/general/admin-global-settings-section.tsx
 msgid "Off"
@@ -7719,6 +7924,10 @@ msgstr "Oeps! Er is iets misgegaan."
 #: apps/remix/app/routes/_authenticated+/o.$orgUrl._index.tsx
 msgid "Open menu"
 msgstr "Menu openen"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Open native document"
+msgstr ""
 
 #: apps/remix/app/components/general/stack-avatars-with-tooltip.tsx
 msgid "Opened"
@@ -8007,6 +8216,19 @@ msgctxt "Partially signed document (adjective)"
 msgid "Partial"
 msgstr "Gedeeltelijk"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Partially Completed"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Participant Timeline"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Participant:"
+msgstr ""
+
 #: apps/remix/app/components/forms/signin.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-auth-dialog.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-auth-passkey.tsx
@@ -8119,6 +8341,7 @@ msgstr "PDF-document"
 #: apps/remix/app/routes/_authenticated+/admin+/email-domains._index.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/email-domains.$id.tsx
 #: apps/remix/app/routes/_authenticated+/o.$orgUrl.settings.members.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 #: packages/lib/constants/document.ts
 #: packages/ui/components/document/document-read-only-fields.tsx
 #: packages/ui/components/document/envelope-recipient-field-tooltip.tsx
@@ -8152,6 +8375,10 @@ msgstr "Openstaande organisatie-uitnodigingen"
 #: apps/remix/app/routes/_authenticated+/admin+/email-domains.$id.tsx
 msgid "Pending since"
 msgstr "In behandeling sinds"
+
+#: apps/remix/app/routes/_authenticated+/admin+/organisations.$id.tsx
+msgid "People with access to this organisation."
+msgstr ""
 
 #: apps/remix/app/components/dialogs/organisation-create-dialog.tsx
 #: apps/remix/app/components/general/billing-plans.tsx
@@ -8314,10 +8541,6 @@ msgstr "Voer een betekenisvolle naam in voor je token. Hiermee kun je het later 
 #: apps/remix/app/components/dialogs/sign-field-number-dialog.tsx
 msgid "Please enter a number"
 msgstr "Voer een nummer in"
-
-#: apps/remix/app/components/general/claim-account.tsx
-msgid "Please enter a valid name."
-msgstr "Voer een geldige naam in."
 
 #: apps/remix/app/components/dialogs/sign-field-number-dialog.tsx
 msgid "Please enter a valid number"
@@ -8512,6 +8735,10 @@ msgstr "Bekijk een voorbeeld van het document voordat u het verstuurt"
 msgid "Preview what the signed document will look like with placeholder data"
 msgstr "Bekijk een voorbeeld van hoe het ondertekende document eruitziet met placeholdergegevens"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Previous stage incomplete"
+msgstr ""
+
 #: apps/remix/app/components/forms/branding-preferences-form.tsx
 msgid "Primary"
 msgstr "Primair"
@@ -8662,12 +8889,17 @@ msgstr "Leesstatus"
 msgid "Read the full <0>signature disclosure</0>."
 msgstr "Lees de volledige <0>kennisgeving elektronische handtekening</0>."
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Read-Only Participants"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/ai-field-detection-dialog.tsx
 #: apps/remix/app/components/dialogs/ai-recipient-detection-dialog.tsx
 msgid "Reading your document"
 msgstr "Uw document wordt gelezen"
 
 #: apps/remix/app/components/general/document/document-page-view-recipients.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 msgid "Ready"
 msgstr "Klaar"
 
@@ -8881,6 +9113,10 @@ msgstr "Ontvangers worden ervan op de hoogte gesteld dat het document is geannul
 msgid "Recipients will still retain their copy of the document"
 msgstr "Ontvangers behouden nog steeds hun kopie van het document"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Reconciliation"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/admin+/email-domains.$id.tsx
 msgid "Record"
 msgstr "Record"
@@ -8950,11 +9186,19 @@ msgstr "Document weigeren"
 #: apps/remix/app/components/general/document/document-status.tsx
 #: apps/remix/app/components/general/envelope-editor/envelope-editor-header.tsx
 #: apps/remix/app/components/general/stack-avatars-with-tooltip.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 #: packages/lib/constants/document.ts
 #: packages/lib/server-only/pdf/render-certificate.ts
 msgid "Rejected"
 msgstr "Geweigerd"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Rejected at:"
+msgstr ""
 
 #: packages/email/template-components/template-document-rejection-confirmed.tsx
 msgid "Rejection Confirmed"
@@ -9057,6 +9301,10 @@ msgstr "Organisatielid verwijderen"
 msgid "Remove Organisation Member"
 msgstr "Organisatielid verwijderen"
 
+#: apps/remix/app/components/general/rate-limit-array-input.tsx
+msgid "Remove rate limit"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/ai-recipient-detection-dialog.tsx
 msgid "Remove recipient"
 msgstr "Ontvanger verwijderen"
@@ -9129,6 +9377,22 @@ msgstr "Rapporten"
 #: apps/remix/app/components/general/webhook-logs-sheet.tsx
 msgid "Request"
 msgstr "Verzoek"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Request correlation"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Request not active yet"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Request Summary"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Request terminated"
+msgstr ""
 
 #: apps/remix/app/routes/_unauthenticated+/organisation.sso.confirmation.$token.tsx
 msgid "Requesting Organisation"
@@ -9247,6 +9511,10 @@ msgstr "Oplossen"
 msgid "Resolve payment"
 msgstr "Betaling oplossen"
 
+#: apps/remix/app/components/general/organisation-usage-panel.tsx
+msgid "Resource blocked"
+msgstr ""
+
 #: apps/remix/app/components/general/webhook-logs-sheet.tsx
 msgid "Response"
 msgstr "Antwoord"
@@ -9278,6 +9546,10 @@ msgstr "Opnieuw geprobeerd"
 #: apps/remix/app/components/general/document-signing/document-signing-auth-passkey.tsx
 msgid "Retry"
 msgstr "Opnieuw proberen"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Retry Scheduled"
+msgstr ""
 
 #: apps/remix/app/components/general/document-signing/document-signing-page-view-v2.tsx
 #: apps/remix/app/routes/_unauthenticated+/o.$orgUrl.signin.tsx
@@ -9313,6 +9585,10 @@ msgstr "Terug naar inloggen"
 #: apps/remix/app/components/general/envelope-editor/envelope-editor.tsx
 msgid "Return to templates"
 msgstr "Terug naar sjablonen"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Reusable signing request"
+msgstr ""
 
 #: packages/email/templates/organisation-account-link-confirmation.tsx
 msgid "Review request"
@@ -9365,6 +9641,10 @@ msgstr "Rol"
 #: apps/remix/app/routes/_authenticated+/admin+/users.$id.tsx
 msgid "Roles"
 msgstr "Rollen"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Routing policy"
+msgstr ""
 
 #: packages/ui/primitives/data-table-pagination.tsx
 msgid "Rows per page"
@@ -9823,6 +10103,10 @@ msgstr "Verzenden..."
 msgid "Sent"
 msgstr "Verzonden"
 
+#: apps/remix/app/components/general/organisation-usage-panel.tsx
+msgid "Sent this period"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/settings+/security.sessions.tsx
 msgid "Session revoked"
 msgstr "Sessie ingetrokken"
@@ -10078,6 +10362,10 @@ msgstr "Handtekening-instellingen"
 msgid "Signature types"
 msgstr "Handtekeningtypen"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Signature Validation Not Available"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Signatures Collected"
 msgstr "Verzamelde handtekeningen"
@@ -10182,6 +10470,18 @@ msgstr "Ondertekeningsvolgorde is ingeschakeld."
 #: apps/remix/app/components/general/envelope-editor/envelope-editor-settings-dialog.tsx
 msgid "Signing Reminders"
 msgstr "Herinneringen voor ondertekening"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Signing request not found"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Signing Session"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Signing Stages"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 msgid "Signing Status"
@@ -10382,6 +10682,14 @@ msgstr "We konden het certificaat niet downloaden. Probeer het later opnieuw."
 msgid "Source"
 msgstr "Bron"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Source filename"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Source reference"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/o.$orgUrl.settings.sso.tsx
 msgid "Space-separated list of domains. Leave empty to allow all domains."
 msgstr "Door spaties gescheiden lijst met domeinen. Laat leeg om alle domeinen toe te staan."
@@ -10393,6 +10701,19 @@ msgstr "Spaans"
 #: apps/remix/app/routes/_authenticated+/o.$orgUrl.settings._layout.tsx
 msgid "SSO"
 msgstr "SSO"
+
+#. placeholder {0}: stage.order
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Stage {0}"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Stage status:"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Stage:"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
 msgid "Stats"
@@ -10415,6 +10736,12 @@ msgstr "Statistieken"
 #: packages/lib/server-only/pdf/render-audit-logs.ts
 msgid "Status"
 msgstr "Status"
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Status updated:"
+msgstr ""
 
 #. placeholder {0}: currentStepData.order
 #. placeholder {1}: envelopeEditorSteps.length
@@ -10625,6 +10952,10 @@ msgstr "Licentie met server synchroniseren"
 msgid "Sync Stripe subscription"
 msgstr "Stripe-abonnement synchroniseren"
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "System"
+msgstr ""
+
 #: packages/lib/utils/document-audit-logs.ts
 #: packages/lib/utils/document-audit-logs.ts
 #: packages/lib/utils/document-audit-logs.ts
@@ -10805,10 +11136,10 @@ msgid "Team URL"
 msgstr "Team‑URL"
 
 #: apps/remix/app/components/general/org-menu-switcher.tsx
+#: apps/remix/app/components/general/organisation-usage-panel.tsx
 #: apps/remix/app/components/tables/admin-organisation-overview-table.tsx
 #: apps/remix/app/components/tables/organisation-insights-table.tsx
 #: apps/remix/app/components/tables/organisation-insights-table.tsx
-#: apps/remix/app/routes/_authenticated+/admin+/organisations.$id.tsx
 #: apps/remix/app/routes/_authenticated+/dashboard.tsx
 #: apps/remix/app/routes/_authenticated+/o.$orgUrl.settings._layout.tsx
 #: apps/remix/app/routes/_authenticated+/o.$orgUrl.settings.teams.tsx
@@ -10818,6 +11149,10 @@ msgstr "Teams"
 #: apps/remix/app/routes/_authenticated+/o.$orgUrl._index.tsx
 msgid "Teams help you organise your work and collaborate with others. Create your first team to get started."
 msgstr "Teams helpen je je werk te organiseren en samen te werken met anderen. Maak je eerste team aan om te beginnen."
+
+#: apps/remix/app/routes/_authenticated+/admin+/organisations.$id.tsx
+msgid "Teams that belong to this organisation."
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/o.$orgUrl.settings.groups.$id.tsx
 msgid "Teams that this organisation group is currently assigned to"
@@ -11354,6 +11689,10 @@ msgstr "De ondertekeningslink is naar je klembord gekopieerd."
 #: apps/remix/app/components/general/document-signing/csc-recipient-signing-in-progress-page.tsx
 msgid "The signing provider did not respond in time. Please retry."
 msgstr "De ondertekeningsprovider heeft niet op tijd gereageerd. Probeer het opnieuw."
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "The signing request you are looking for could not be found or is not available for this team."
+msgstr ""
 
 #: packages/email/templates/recipient-expired.tsx
 msgid "The signing window for \"{recipientName}\" on document \"{documentName}\" has expired."
@@ -12297,8 +12636,6 @@ msgstr "Onbekende naam"
 #: apps/remix/app/components/general/claim-limit-fields.tsx
 #: apps/remix/app/components/general/organisation-usage-panel.tsx
 #: apps/remix/app/components/tables/admin-claims-table.tsx
-#: apps/remix/app/routes/_authenticated+/admin+/organisations.$id.tsx
-#: apps/remix/app/routes/_authenticated+/admin+/organisations.$id.tsx
 msgid "Unlimited"
 msgstr "Onbeperkt"
 
@@ -12458,6 +12795,10 @@ msgstr "Gebruiker bijwerken"
 msgid "Updated {organisationMemberName} to {roleLabel}."
 msgstr "{organisationMemberName} is bijgewerkt naar {roleLabel}."
 
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Updated at"
+msgstr ""
+
 #: apps/remix/app/routes/embed+/v2+/authoring+/envelope.edit.$id.tsx
 msgid "Updating Document"
 msgstr "Document bijwerken"
@@ -12591,14 +12932,17 @@ msgstr "Uploaden"
 msgid "URL"
 msgstr "URL"
 
-#. placeholder {0}: selectedStat?.period || 'N/A'
-#: apps/remix/app/components/general/organisation-usage-panel.tsx
-msgid "Usage for period: {0}"
-msgstr "Gebruik voor periode: {0}"
-
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/templates.$id._index.tsx
 msgid "Use"
 msgstr "Gebruiken"
+
+#: apps/remix/app/components/general/rate-limit-array-input.tsx
+msgid "Use a duration with a unit, e.g. 5m, 1h, or 24h"
+msgstr ""
+
+#: apps/remix/app/components/general/rate-limit-array-input.tsx
+msgid "Use a unique window for each rate limit"
+msgstr ""
 
 #: apps/remix/app/components/forms/2fa/disable-authenticator-app-dialog.tsx
 #: apps/remix/app/components/forms/signin.tsx
@@ -12715,6 +13059,10 @@ msgstr "Verificatie‑e‑mail verzonden"
 #: apps/remix/app/components/general/verify-email-banner.tsx
 msgid "Verification email sent successfully."
 msgstr "Verificatie‑e‑mail succesvol verzonden."
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+msgid "Verified SHA-256"
+msgstr ""
 
 #: apps/remix/app/components/general/document-signing/access-auth-2fa-form.tsx
 msgid "Verify & Complete"
@@ -12912,6 +13260,7 @@ msgstr "Bekijk, sorteer en filter maandelijkse gebruiksstatistieken per organisa
 
 #: apps/remix/app/components/embed/multisign/multi-sign-document-list.tsx
 #: apps/remix/app/components/general/document/document-page-view-recipients.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 #: packages/lib/server-only/pdf/render-certificate.ts
 msgid "Viewed"
@@ -12946,6 +13295,8 @@ msgid "Visibility"
 msgstr "Zichtbaarheid"
 
 #: apps/remix/app/components/general/stack-avatars-with-tooltip.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/integration.signing-requests.$requestId.tsx
 msgid "Waiting"
 msgstr "Wachten"
 
@@ -13501,9 +13852,17 @@ msgstr "Whitelabeling, onbeperkte leden en meer"
 msgid "Width:"
 msgstr "Breedte:"
 
+#: apps/remix/app/components/general/rate-limit-array-input.tsx
+msgid "Window"
+msgstr ""
+
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Withdrawing Consent"
 msgstr "Toestemming intrekken"
+
+#: apps/remix/app/components/general/organisation-usage-panel.tsx
+msgid "Within limit"
+msgstr ""
 
 #: apps/remix/app/components/forms/public-profile-form.tsx
 msgid "Write a description to display on your public profile"

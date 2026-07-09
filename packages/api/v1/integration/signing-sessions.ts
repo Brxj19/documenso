@@ -14,6 +14,7 @@ import type {
 } from './schema';
 import { ZIntegrationApiV1CreateSigningSessionResponseSchema } from './schema';
 import { getIntegrationApiV1SigningRequest } from './signing-requests';
+import { assertIntegrationRequestNotTerminal } from './terminal-state';
 import { validateAbsoluteAllowlistedUrl } from './url-allowlist';
 
 const DEFAULT_SIGNING_SESSION_TTL_SECONDS = 15 * 60;
@@ -239,6 +240,8 @@ export const createIntegrationApiV1SigningSession = async ({
       message: 'Signing request must be active before creating signing sessions.',
     });
   }
+
+  assertIntegrationRequestNotTerminal(signingRequest.status);
 
   if (!['IN_PROGRESS', 'PARTIALLY_COMPLETED'].includes(signingRequest.status)) {
     throw new AppError(AppErrorCode.INVALID_REQUEST, {
