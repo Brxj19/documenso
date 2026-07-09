@@ -10,7 +10,7 @@ const REGULATORY_HYBRID_STAGES: WorkflowStage[] = [
   {
     order: 2,
     label: 'Medical & Quality Review',
-    participantIds: ['dms-user-medical-001', 'dms-user-quality-001'],
+    participantIds: ['dms-user-medical-001', 'dms-user-quality-001', 'dms-user-ext-consult-001'],
     completionPolicy: 'ALL_REQUIRED',
   },
   {
@@ -45,6 +45,19 @@ const SIGNING_PARTICIPANTS: SigningParticipant[] = [
     role: 'SIGNER',
     stageOrder: 2,
     metadata: { identitySource: 'DMS_USER_DIRECTORY', dmsUserId: 'user-quality-001' },
+  },
+  {
+    participantId: 'dms-user-ext-consult-001',
+    name: 'External Consultant',
+    email: 'external.consultant@example.test',
+    role: 'SIGNER',
+    stageOrder: 2,
+    metadata: {
+      identitySource: 'EXTERNAL_RECIPIENT',
+      externalSignerId: 'user-ext-consult-001',
+      verificationMethod: 'EMAIL_OTP',
+      verificationStatus: 'PENDING',
+    },
   },
   {
     participantId: 'dms-user-reg-lead-001',
@@ -134,6 +147,19 @@ export function canFreezeFile(file: DmsFile): boolean {
 
 export function canStartSigning(file: DmsFile): boolean {
   return file.status === 'APPROVED' || file.status === 'READY_FOR_ESIGNATURE';
+}
+
+export function getParticipantById(participantId: string): SigningParticipant | undefined {
+  return SIGNING_PARTICIPANTS.find((p) => p.participantId === participantId);
+}
+
+export function getWorkflowBySigningRequestId(signingRequestId: string): DmsWorkflow | undefined {
+  for (const workflow of workflowStore.values()) {
+    if (workflow.signingRequestId === signingRequestId) {
+      return workflow;
+    }
+  }
+  return undefined;
 }
 
 export function mapIntegrationStatusToDms(status: string): DmsDocumentStatus {

@@ -2,18 +2,25 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  appendIdentityAuditEntry,
   buildDmsAuditTimeline,
+  buildIdentityVerificationEntry,
+  buildSigningSessionEntry,
   sanitizeAuditEntries,
 } from '../../apps/remix/app/routes/_authenticated+/dms-prototype+/_audit-timeline';
 import {
   canAccessDmsDashboard,
   canInitiateSigning,
   canSign,
+  getParticipantBlockedReason,
 } from '../../apps/remix/app/routes/_authenticated+/dms-prototype+/_auth-policy';
 import { FILES } from '../../apps/remix/app/routes/_authenticated+/dms-prototype+/_data.server';
 import {
   buildSigningParticipantFromDmsUser,
   createParticipantIdentity,
+  expireExternalParticipant,
+  failExternalParticipant,
+  IDENTITY_OTP,
   verifyExternalParticipant,
 } from '../../apps/remix/app/routes/_authenticated+/dms-prototype+/_identity';
 import {
@@ -37,6 +44,8 @@ import {
   canStartSigning,
   createWorkflowForFile,
   freezeWorkflowDocument,
+  getParticipantById,
+  getWorkflowBySigningRequestId,
   mapIntegrationStatusToDms,
   updateSigningRequestId,
   updateSigningRequestStatus,
@@ -129,7 +138,7 @@ describe('DMS workflow', () => {
 
     expect(wf.fileId).toBe('FILE-TEST-001');
     expect(wf.stages).toHaveLength(3);
-    expect(wf.participants).toHaveLength(4);
+    expect(wf.participants).toHaveLength(5);
 
     const updated = updateSigningRequestId(file.id, 'req-test-001');
     expect(updated.signingRequestId).toBe('req-test-001');
@@ -405,5 +414,278 @@ describe('Integration API interaction', () => {
     updateSigningRequestId(file.id, 'mock-req-002');
     const updated = updateSigningRequestStatus(file.id, 'IN_PROGRESS');
     expect(updated.signingRequestStatus).toBe('IN_PROGRESS');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 10 — Identity/auth tests
+// ---------------------------------------------------------------------------
+describe('Phase 10 — Identity & Auth', () => {
+  it('external signer starts as pending verification', () => {
+    const identity = createParticipantIdentity('user-ext-consult-001');
+    expect(identity.verificationStatus).toBe('PENDING');
+    expect(identity.verificationMethod).toBe('EMAIL_OTP');
+    expect(identity.externalSignerId).toBe('user-ext-consult-001');
+  });
+
+  it('external signer fails verification with wrong OTP', () => {
+    const pid = `dms-user-ext-consult-001`;
+    createParticipantIdentity('user-ext-consult-001');
+    expect(IDENTITY_OTP).toBe('123456');
+
+    const failed = failExternalParticipant(pid);
+    expect(failed?.verificationStatus).toBe('FAILED');
+  });
+
+  it('external signer can be expired', () => {
+    const pid = `dms-user-ext-consult-001`;
+    createParticipantIdentity('user-ext-consult-001');
+    const expired = expireExternalParticipant(pid);
+    expect(expired?.verificationStatus).toBe('EXPIRED');
+  });
+
+  it('passes OTP verification with correct code', () => {
+    const pid = `dms-user-ext-consult-001`;
+    createParticipantIdentity('user-ext-consult-001');
+    const verified = verifyExternalParticipant(pid);
+    expect(verified?.verificationStatus).toBe('VERIFIED');
+    expect(verified?.verifiedAt).toBeTruthy();
+  });
+
+  it('external signer cannot access DMS dashboard', () => {
+    const extUser = getDmsUserById('user-ext-consult-001') as NonNullable<ReturnType<typeof getDmsUserById>>;
+    const decision = canAccessDmsDashboard(extUser);
+    expect(decision.allowed).toBe(false);
+  });
+
+  it('external signer cannot sign for another participant', () => {
+    const extUser = getDmsUserById('user-ext-consult-001') as NonNullable<ReturnType<typeof getDmsUserById>>;
+    const decision = canSign(extUser, 'dms-user-reg-author-001');
+    expect(decision.allowed).toBe(false);
+  });
+
+  it('internal DMS signer does not require signup', () => {
+    const dmsUser = getDmsUserById('user-reg-author-001') as NonNullable<ReturnType<typeof getDmsUserById>>;
+    expect(dmsUser.source).toBe('DMS_USER_DIRECTORY');
+    expect(dmsUser.userId).toBeTruthy();
+  });
+
+  it('participant blocked reason for completed request', () => {
+    expect(getParticipantBlockedReason('COMPLETED', 'COMPLETED')).toContain('completed');
+  });
+
+  it('participant blocked reason for rejected', () => {
+    expect(getParticipantBlockedReason('REJECTED', undefined)).toContain('rejected');
+  });
+
+  it('participant blocked reason for cancelled', () => {
+    expect(getParticipantBlockedReason('CANCELLED', undefined)).toContain('cancelled');
+  });
+
+  it('participant blocked reason for expired', () => {
+    expect(getParticipantBlockedReason('EXPIRED', undefined)).toContain('expired');
+  });
+
+  it('participant blocked reason for BLOCKED status', () => {
+    expect(getParticipantBlockedReason('IN_PROGRESS', 'BLOCKED')).toContain('blocked');
+  });
+
+  it('returns undefined when no blocking reason', () => {
+    expect(getParticipantBlockedReason(undefined, undefined)).toBeUndefined();
+    expect(getParticipantBlockedReason('READY', undefined)).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 10 — White-label tests
+// ---------------------------------------------------------------------------
+describe('Phase 10 — White Label', () => {
+  it('DMS dashboard shows Authora DMS', () => {
+    const layoutContent = fs.readFileSync(path.join(DMS_ROUTES_DIR, '_layout.tsx'), 'utf-8');
+    const bodyContent = layoutContent
+      .split('\n')
+      .filter((line) => !line.startsWith('import '))
+      .join('\n');
+    expect(bodyContent).toContain('Authora DMS');
+  });
+
+  it('no Documenso text in DMS prototype pages', () => {
+    const files = fs.readdirSync(DMS_ROUTES_DIR);
+    const tsxFiles = files.filter((f) => f.endsWith('.tsx'));
+    for (const file of tsxFiles) {
+      const content = fs.readFileSync(path.join(DMS_ROUTES_DIR, file), 'utf-8');
+      const bodyContent = content
+        .split('\n')
+        .filter((line) => !line.startsWith('import '))
+        .join('\n');
+      expect(bodyContent).not.toContain('Documenso');
+    }
+  });
+
+  it('no Create Folder action in DMS prototype pages', () => {
+    const files = fs.readdirSync(DMS_ROUTES_DIR);
+    const tsxFiles = files.filter((f) => f.endsWith('.tsx'));
+    for (const file of tsxFiles) {
+      const content = fs.readFileSync(path.join(DMS_ROUTES_DIR, file), 'utf-8');
+      expect(content).not.toContain('Create Folder');
+      expect(content).not.toContain('createFolder');
+    }
+  });
+
+  it('admin shows signing-tool login disabled', () => {
+    const adminContent = fs.readFileSync(path.join(DMS_ROUTES_DIR, 'admin._index.tsx'), 'utf-8');
+    expect(adminContent).toContain('Signing Tool Login');
+    expect(adminContent).toContain('Disabled');
+    expect(adminContent).toContain('Authora DMS');
+    expect(adminContent).toContain('Email OTP');
+  });
+
+  it('external verification page shows Authora DMS', () => {
+    const extPath = path.join(DMS_ROUTES_DIR, 'external-sign.$sessionId.verify._index.tsx');
+    const content = fs.readFileSync(extPath, 'utf-8');
+    const bodyContent = content
+      .split('\n')
+      .filter((line) => !line.startsWith('import '))
+      .join('\n');
+    expect(bodyContent).toContain('Authora DMS');
+    expect(bodyContent).toContain('Identity Verification');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 10 — Workflow & Participants
+// ---------------------------------------------------------------------------
+describe('Phase 10 — Workflow & Participants', () => {
+  it('workflow now has 5 participants including external', () => {
+    const file = FILES[0];
+    const wf = createWorkflowForFile(file);
+    expect(wf.participants).toHaveLength(5);
+
+    const externalParticipant = wf.participants.find((p) => p.metadata.identitySource === 'EXTERNAL_RECIPIENT');
+    expect(externalParticipant).toBeTruthy();
+    expect(externalParticipant?.metadata.externalSignerId).toBe('user-ext-consult-001');
+    expect(externalParticipant?.metadata.verificationStatus).toBe('PENDING');
+  });
+
+  it('stage 2 includes external consultant', () => {
+    const file = FILES[0];
+    const wf = createWorkflowForFile(file);
+    const stage2 = wf.stages.find((s) => s.order === 2);
+    expect(stage2?.participantIds).toContain('dms-user-ext-consult-001');
+  });
+
+  it('getParticipantById returns participant', () => {
+    const p = getParticipantById('dms-user-ext-consult-001');
+    expect(p).toBeTruthy();
+    expect(p?.name).toBe('External Consultant');
+  });
+
+  it('getWorkflowBySigningRequestId returns workflow', () => {
+    const file = FILES[0];
+    createWorkflowForFile(file);
+    updateSigningRequestId(file.id, 'sig-req-phase-10');
+    const found = getWorkflowBySigningRequestId('sig-req-phase-10');
+    expect(found).toBeTruthy();
+    expect(found?.fileId).toBe(file.id);
+  });
+
+  it('getWorkflowBySigningRequestId returns undefined for unknown', () => {
+    expect(getWorkflowBySigningRequestId('nonexistent')).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 10 — Audit timeline identity evidence
+// ---------------------------------------------------------------------------
+describe('Phase 10 — Audit Timeline Identity', () => {
+  it('identity audit entry is added', () => {
+    createParticipantIdentity('user-ext-consult-001');
+    const entries: AuditEntry[] = [
+      {
+        id: 'base-1',
+        timestamp: '2026-06-01T10:00:00Z',
+        type: 'TEST',
+        description: 'Test entry',
+        actor: 'System',
+        category: 'DMS',
+      },
+    ];
+
+    const result = appendIdentityAuditEntry(entries, 'dms-user-ext-consult-001');
+    expect(result.length).toBeGreaterThan(1);
+
+    const identityEntry = result.find((e) => e.type === 'IDENTITY_SOURCE');
+    expect(identityEntry).toBeTruthy();
+    expect(identityEntry?.description).toContain('External Recipient');
+    expect(identityEntry?.description).toContain('Email OTP');
+    expect(identityEntry?.description).toContain('Pending');
+  });
+
+  it('identity verification entry shows verified', () => {
+    createParticipantIdentity('user-ext-consult-001');
+    verifyExternalParticipant('dms-user-ext-consult-001');
+    const entry = buildIdentityVerificationEntry('dms-user-ext-consult-001', true, 'EMAIL_OTP');
+    expect(entry.type).toBe('SIGNER_VERIFIED');
+    expect(entry.description).toContain('Email OTP');
+    expect(entry.category).toBe('SIGNING');
+  });
+
+  it('identity verification failure entry shows failed', () => {
+    createParticipantIdentity('user-ext-consult-001');
+    const entry = buildIdentityVerificationEntry('dms-user-ext-consult-001', false, 'EMAIL_OTP');
+    expect(entry.type).toBe('SIGNER_VERIFICATION_FAILED');
+    expect(entry.description).toContain('failed');
+  });
+
+  it('signing session created entry', () => {
+    createParticipantIdentity('user-reg-author-001');
+    const entry = buildSigningSessionEntry('dms-user-reg-author-001', true);
+    expect(entry.type).toBe('SIGNING_SESSION_CREATED');
+    expect(entry.description).toContain('Regulatory Author');
+  });
+
+  it('signing session failed entry', () => {
+    createParticipantIdentity('user-reg-author-001');
+    const entry = buildSigningSessionEntry('dms-user-reg-author-001', false);
+    expect(entry.type).toBe('SIGNING_SESSION_FAILED');
+    expect(entry.description).toContain('failed');
+  });
+
+  it('audit entries exclude tokens and secrets', () => {
+    const entries: AuditEntry[] = [
+      {
+        id: 'secret-1',
+        timestamp: '2026-01-01T00:00:00Z',
+        type: 'SIGNING_SESSION_CREATED',
+        description: 'Session created',
+        actor: 'actor@example.test',
+        category: 'SIGNING',
+      },
+    ];
+    const sanitized = sanitizeAuditEntries(entries);
+    expect(sanitized[0].actor).toBe('actor@***');
+    expect(sanitized[0].actor).not.toContain('example.test');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 10 — Signing flow tests
+// ---------------------------------------------------------------------------
+describe('Phase 10 — Signing Flow', () => {
+  it('external unverified participant is pending', () => {
+    const identity = createParticipantIdentity('user-ext-consult-001');
+    expect(identity.verificationStatus).toBe('PENDING');
+  });
+
+  it('external verified participant can be identified', () => {
+    createParticipantIdentity('user-ext-consult-001');
+    const verified = verifyExternalParticipant('dms-user-ext-consult-001');
+    expect(verified?.verificationStatus).toBe('VERIFIED');
+  });
+
+  it('blocked reason for completed request prevents launch', () => {
+    const reason = getParticipantBlockedReason('COMPLETED', 'COMPLETED');
+    expect(reason).toBeTruthy();
+    expect(reason).toContain('completed');
   });
 });

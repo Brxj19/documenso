@@ -1,6 +1,6 @@
 import { sendDocument } from '@documenso/lib/server-only/document/send-document';
 import { createEnvelope } from '@documenso/lib/server-only/envelope/create-envelope';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@documenso/lib/server-only/document/send-document', () => ({
   sendDocument: vi.fn(),
@@ -23,6 +23,10 @@ import {
 } from './route';
 
 describe('integration api v1 route', () => {
+  beforeEach(() => {
+    delete process.env.INTEGRATION_API_V1_ENABLED;
+  });
+
   afterEach(() => {
     delete process.env.INTEGRATION_API_V1_ENABLED;
     vi.restoreAllMocks();

@@ -16,10 +16,13 @@ import {
 import { useState } from 'react';
 import { Link, useRevalidator } from 'react-router';
 import { buildDmsAuditTimeline, sanitizeAuditEntries } from './_audit-timeline';
+import { getParticipantBlockedReason } from './_auth-policy';
 import { getFileById } from './_data.server';
+import type { ParticipantIdentity } from './_identity';
+import { getParticipantIdentity } from './_identity';
 import { freezeApprovedFileForSigning } from './_pdf-freeze.server';
 import { DmsSigningClient } from './_signing-client.server';
-import type { AuditEntry } from './_types';
+import type { AuditEntry, SigningParticipant } from './_types';
 import {
   canFreezeFile,
   canStartSigning,
@@ -494,23 +497,133 @@ export default function FileWorkspace({ loaderData }: Route.ComponentProps) {
               )}
 
               <div>
-                <h4 className="mb-2 font-medium text-sm">Hybrid Signing Route</h4>
+                <h4 className="mb-2 font-medium text-sm">Participants & Signing Route</h4>
                 {workflow.stages.map((stage) => {
                   const stageParticipants = stage.participantIds
-                    .map((pid) => workflow.participants.find((p) => p.participantId === pid))
-                    .filter(Boolean);
+                    .map((pid) => {
+                      const p = workflow.participants.find((wp) => wp.participantId === pid);
+                      const ident = getParticipantIdentity(pid);
+                      return { participant: p, identity: ident };
+                    })
+                    .filter(
+                      (item): item is { participant: SigningParticipant; identity: ParticipantIdentity | undefined } =>
+                        Boolean(item.participant),
+                    );
 
                   return (
-                    <div key={stage.order} className="mb-2 rounded-md border border-border p-3">
+                    <div key={stage.order} className="mb-3 rounded-md border border-border p-3">
                       <div className="flex items-center gap-2 font-medium text-sm">
                         <ShieldCheckIcon className="h-4 w-4" />
                         Stage {stage.order}: {stage.label}
                       </div>
-                      <div className="mt-1 text-muted-foreground text-xs">
-                        {stageParticipants.map((p) => p?.name).join(', ')}
-                      </div>
                       <div className="text-muted-foreground text-xs">
                         {stage.completionPolicy === 'ALL_REQUIRED' ? 'All required' : 'Any'}
+                      </div>
+
+                      <div className="mt-2 space-y-2">
+                        {stageParticipants.map(({ participant, identity }) => {
+                          const isExternal = participant.metadata.identitySource === 'EXTERNAL_RECIPIENT';
+                          const verStatus = identity?.verificationStatus ?? participant.metadata.verificationStatus;
+                          const blockedReason = getParticipantBlockedReason(signingStatus, undefined);
+
+                          const handleParticipantLaunch = async () => {
+                            const wrapperUrl = `/dms-prototype/signing/${signingRequestId}/participants/${participant.participantId}`;
+                            window.open(wrapperUrl, '_blank');
+                          };
+
+                          const handleVerifyExternal = () => {
+                            window.open(`/dms-prototype/external-sign/${participant.participantId}/verify`, '_blank');
+                          };
+
+                          return (
+                            <div key={participant.participantId} className="rounded-md bg-muted/30 p-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-xs">{participant.name}</span>
+                                  {isExternal ? (
+                                    <Badge variant="neutral" size="small">
+                                      External
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="default" size="small">
+                                      DMS User
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {verStatus === 'VERIFIED' && (
+                                    <Badge variant="default" size="small">
+                                      Verified
+                                    </Badge>
+                                  )}
+                                  {verStatus === 'PENDING' && (
+                                    <Badge variant="neutral" size="small">
+                                      Pending
+                                    </Badge>
+                                  )}
+                                  {verStatus === 'FAILED' && (
+                                    <Badge variant="destructive" size="small">
+                                      Failed
+                                    </Badge>
+                                  )}
+                                  {verStatus === 'EXPIRED' && (
+                                    <Badge variant="destructive" size="small">
+                                      Expired
+                                    </Badge>
+                                  )}
+                                  {!verStatus && (
+                                    <Badge variant="secondary" size="small">
+                                      N/A
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="mt-1 text-muted-foreground text-xs">
+                                {participant.email}
+                                {identity?.identitySource && (
+                                  <span>
+                                    {' '}
+                                    ·{' '}
+                                    {identity.identitySource === 'DMS_USER_DIRECTORY'
+                                      ? 'DMS User Directory'
+                                      : 'External Recipient'}
+                                  </span>
+                                )}
+                                {identity?.verificationMethod && identity.verificationMethod !== 'NONE' && (
+                                  <span> · {identity.verificationMethod}</span>
+                                )}
+                              </div>
+
+                              <div className="mt-2 flex gap-2">
+                                {!blockedReason &&
+                                  signingRequestId &&
+                                  signingStatus !== 'READY' &&
+                                  (isExternal && (!verStatus || verStatus !== 'VERIFIED') ? (
+                                    <Button size="sm" variant="secondary" onClick={handleVerifyExternal}>
+                                      Verify External Signer
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={handleParticipantLaunch}
+                                      disabled={!signingRequestId}
+                                    >
+                                      Launch Signing
+                                    </Button>
+                                  ))}
+                              </div>
+
+                              {blockedReason && (
+                                <div className="mt-1 flex items-center gap-1 text-muted-foreground text-xs">
+                                  <ClockIcon className="h-3 w-3" />
+                                  {blockedReason}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );

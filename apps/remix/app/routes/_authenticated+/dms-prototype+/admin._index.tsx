@@ -16,6 +16,52 @@ export default function AdminSettings({ loaderData }: Route.ComponentProps) {
       <h2 className="font-semibold text-lg">Admin Settings</h2>
       <p className="text-muted-foreground text-sm">Prototype settings — read only</p>
 
+      <Card className="mt-4">
+        <CardHeader>
+          <CardTitle className="text-sm">Signing Configuration</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="divide-y divide-border text-sm">
+            <div className="flex items-center justify-between py-2">
+              <span className="text-muted-foreground">Identity Source</span>
+              <Badge variant="default" size="small">
+                DMS User Directory
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-muted-foreground">External Signer Verification</span>
+              <Badge variant="default" size="small">
+                Email OTP
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-muted-foreground">Signing Tool Login</span>
+              <Badge variant="neutral" size="small">
+                Disabled for DMS Flow
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-muted-foreground">Signup</span>
+              <Badge variant="neutral" size="small">
+                Disabled for DMS Flow
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-muted-foreground">Branding</span>
+              <Badge variant="default" size="small">
+                Authora DMS
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-muted-foreground">Folder Actions</span>
+              <Badge variant="neutral" size="small">
+                Hidden in DMS Prototype
+              </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="mt-6 space-y-6">
         {categories.map((category) => (
           <Card key={category}>
