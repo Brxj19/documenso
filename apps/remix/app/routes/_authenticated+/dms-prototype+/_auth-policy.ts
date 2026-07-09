@@ -40,6 +40,39 @@ export function canAccessAdminSettings(_user: DmsUser): AuthDecision {
   return { allowed: false, reason: 'Admin settings are read-only in prototype' };
 }
 
+export function getParticipantBlockedReason(
+  requestStatus: string | undefined,
+  participantStatus: string | undefined,
+): string | undefined {
+  const terminalRequestStatuses = ['COMPLETED', 'REJECTED', 'CANCELLED', 'EXPIRED'];
+
+  if (requestStatus && terminalRequestStatuses.includes(requestStatus)) {
+    return `Signing request is ${requestStatus.toLowerCase()}`;
+  }
+
+  if (!participantStatus) {
+    return undefined;
+  }
+
+  if (participantStatus === 'COMPLETED') {
+    return 'Participant has already completed signing';
+  }
+
+  if (participantStatus === 'REJECTED') {
+    return 'Participant has rejected the document';
+  }
+
+  if (participantStatus === 'EXPIRED') {
+    return 'Participant session has expired';
+  }
+
+  if (participantStatus === 'BLOCKED') {
+    return 'Participant is blocked — waiting for previous stage';
+  }
+
+  return undefined;
+}
+
 export function getUserByIdentity(userId: string): DmsUser | undefined {
   return DMS_USERS.find((u) => u.userId === userId);
 }

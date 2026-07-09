@@ -67,6 +67,10 @@ export type SigningParticipant = {
     identitySource: DmsUserSource;
     dmsUserId?: string;
     verificationMethod?: string;
+    externalSignerId?: string;
+    verificationStatus?: 'PENDING' | 'VERIFIED' | 'EXPIRED' | 'FAILED';
+    verifiedAt?: string;
+    verifiedBy?: string;
   };
 };
 
@@ -106,6 +110,7 @@ export type EvidenceEvent = {
   timestamp: string;
   actorName?: string;
   actorEmail?: string;
+  description?: string;
   data?: Record<string, unknown>;
 };
 

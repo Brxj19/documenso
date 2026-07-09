@@ -19,7 +19,7 @@ export async function loader(_args: Route.LoaderArgs) {
     ).length,
     draftDocuments: FILES.filter((f) => f.status === 'DRAFT').length,
     pendingReview: DOSSIERS.filter((d) => d.status === 'PENDING_REVIEW' || d.status === 'UNDER_REVIEW').length,
-    pendingApproval: DOSSIERS.filter((d) => d.status === 'APPROVED' && d.status !== 'SIGNING_IN_PROGRESS').length,
+    pendingApproval: DOSSIERS.filter((d) => d.status === 'APPROVED').length,
     awaitingSignature: DOSSIERS.filter((d) => d.status === 'APPROVED').length,
     completedSigned: DOSSIERS.filter((d) => d.status === 'SIGNED_COMPLETE' || d.status === 'SUBMITTED').length,
     recentActivity: getRecentActivity(),
