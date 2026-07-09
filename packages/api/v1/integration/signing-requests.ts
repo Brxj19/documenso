@@ -1,6 +1,15 @@
 import { Buffer } from 'node:buffer';
-import { INTEGRATION_API_V1_CALLBACK_URL_ALLOWLIST } from '@documenso/lib/constants/app';
+import {
+  INTEGRATION_API_V1_CALLBACK_URL_ALLOWLIST,
+  INTEGRATION_API_V1_REMINDER_ENABLED,
+  INTEGRATION_API_V1_REMINDER_MAX_PER_DAY,
+  INTEGRATION_API_V1_REMINDER_MAX_PER_REQUEST,
+  INTEGRATION_API_V1_REMINDER_MIN_INTERVAL_SECONDS,
+} from '@documenso/lib/constants/app';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
+import { cancelDocument } from '@documenso/lib/server-only/document/cancel-document';
+import { rejectDocumentOnBehalfOf } from '@documenso/lib/server-only/document/reject-document-on-behalf-of';
+import { resendDocument } from '@documenso/lib/server-only/document/resend-document';
 import { sendDocument } from '@documenso/lib/server-only/document/send-document';
 import { createEnvelope } from '@documenso/lib/server-only/envelope/create-envelope';
 import { getEnvelopeById } from '@documenso/lib/server-only/envelope/get-envelope-by-id';
@@ -16,12 +25,16 @@ import {
   DocumentSigningOrder,
   DocumentStatus,
   EnvelopeType,
+  IntegrationSigningEventSource,
+  IntegrationSigningEventType,
   IntegrationSigningRequestStatus,
   Prisma,
   ReadStatus,
   RecipientRole,
   SigningStatus,
 } from '@prisma/client';
+
+import { recordIntegrationSigningEvent } from './evidence';
 
 import type {
   TIntegrationApiV1BlockedReasonSchema,
@@ -32,6 +45,7 @@ import type {
   TIntegrationApiV1StageStatusSchema,
   TIntegrationApiV1StatusSchema,
 } from './schema';
+import { assertIntegrationRequestNotTerminal } from './terminal-state';
 import { validateAbsoluteAllowlistedUrl } from './url-allowlist';
 
 type GetIntegrationSigningRequestOptions = {
@@ -280,8 +294,14 @@ const getNormalizedStatus = ({
   const allActionableRecipientsCompleted =
     actionableRecipients.length > 0 && completedActionableCount === actionableRecipients.length;
 
-  if (currentStatus === IntegrationSigningRequestStatus.FAILED) {
-    return 'FAILED';
+  if (
+    currentStatus === IntegrationSigningRequestStatus.FAILED ||
+    currentStatus === IntegrationSigningRequestStatus.CANCELLED ||
+    currentStatus === IntegrationSigningRequestStatus.EXPIRED ||
+    currentStatus === IntegrationSigningRequestStatus.REJECTED ||
+    currentStatus === IntegrationSigningRequestStatus.COMPLETED
+  ) {
+    return currentStatus as TIntegrationApiV1StatusSchema;
   }
 
   if (envelopeStatus === DocumentStatus.CANCELLED) {
@@ -854,11 +874,12 @@ export const sendIntegrationApiV1SigningRequest = async ({
     });
   }
 
-  if (integrationRequest.status === IntegrationSigningRequestStatus.FAILED) {
-    throw new AppError(AppErrorCode.INVALID_REQUEST, {
-      message: 'Failed signing requests cannot be activated.',
-    });
-  }
+  const snapshot = await getIntegrationApiV1SigningRequest({
+    requestId,
+    teamId,
+  });
+
+  assertIntegrationRequestNotTerminal(snapshot.status);
 
   if (integrationRequest.envelope.status === DocumentStatus.DRAFT) {
     await sendDocument({
@@ -877,4 +898,344 @@ export const sendIntegrationApiV1SigningRequest = async ({
     requestId,
     teamId,
   });
+};
+
+export const rejectIntegrationApiV1SigningRequestParticipant = async ({
+  requestId,
+  participantId,
+  teamId,
+  userId,
+  reason,
+  clientCorrelationId,
+  requestMetadata,
+}: {
+  requestId: string;
+  participantId: string;
+  teamId: number;
+  userId: number;
+  reason: string;
+  clientCorrelationId?: string;
+  requestMetadata: ApiRequestMetadata;
+}) => {
+  const snapshot = await getIntegrationApiV1SigningRequest({
+    requestId,
+    teamId,
+    skipReconciliation: true,
+  });
+
+  assertIntegrationRequestNotTerminal(snapshot.status);
+
+  const request = await prisma.integrationSigningRequest.findFirstOrThrow({
+    where: { id: requestId, teamId },
+    include: { participants: true },
+  });
+
+  const participant = snapshot.participants.find((p) => p.participantId === participantId);
+  const requestParticipant = request.participants.find((p) => p.participantId === participantId);
+
+  if (!participant || !requestParticipant) {
+    throw new AppError(AppErrorCode.NOT_FOUND, { message: 'Participant not found' });
+  }
+  if (!requestParticipant.nativeRecipientId) {
+    throw new AppError(AppErrorCode.INVALID_REQUEST, { message: 'Participant has no native recipient' });
+  }
+
+  if (!request.envelopeId) {
+    throw new AppError(AppErrorCode.INVALID_REQUEST, { message: 'Signing request has no native envelope' });
+  }
+
+  await rejectDocumentOnBehalfOf({
+    envelopeId: request.envelopeId,
+    recipientId: requestParticipant.nativeRecipientId,
+    userId,
+    teamId,
+    reason,
+    requestMetadata,
+  });
+
+  await prisma.$transaction(async (tx) => {
+    const enqueueDeliveries: string[] = [];
+
+    await recordIntegrationSigningEvent({
+      tx,
+      request: {
+        id: request.id,
+        callbackUrl: request.callbackUrl,
+        callbackCorrelationId: request.callbackCorrelationId,
+        clientCorrelationId: request.clientCorrelationId,
+        correlationId: request.correlationId ?? request.id,
+      },
+      eventType: IntegrationSigningEventType.PARTICIPANT_REJECTED,
+      source: IntegrationSigningEventSource.API,
+      deduplicationKey: `participant-rejected:${requestParticipant.nativeRecipientId}:${Date.now()}`,
+      eventTimestamp: new Date(),
+      statusAfter: IntegrationSigningRequestStatus.REJECTED,
+      nativeEnvelopeId: request.envelopeId,
+      nativeRecipientId: requestParticipant.nativeRecipientId,
+      actorReference: participant.participantId,
+      participantId: participant.participantId,
+      metadata: { reason, clientCorrelationId },
+      enqueueDeliveries,
+    });
+
+    await tx.integrationSigningRequest.update({
+      where: { id: request.id },
+      data: { status: IntegrationSigningRequestStatus.REJECTED },
+    });
+  });
+
+  return getIntegrationApiV1SigningRequest({ requestId, teamId, skipReconciliation: true });
+};
+
+export const cancelIntegrationApiV1SigningRequest = async ({
+  requestId,
+  teamId,
+  userId,
+  reason,
+  clientCorrelationId,
+  requestMetadata,
+}: {
+  requestId: string;
+  teamId: number;
+  userId: number;
+  reason: string;
+  clientCorrelationId?: string;
+  requestMetadata: ApiRequestMetadata;
+}) => {
+  const snapshot = await getIntegrationApiV1SigningRequest({
+    requestId,
+    teamId,
+    skipReconciliation: true,
+  });
+
+  assertIntegrationRequestNotTerminal(snapshot.status);
+
+  const request = await prisma.integrationSigningRequest.findFirstOrThrow({
+    where: { id: requestId, teamId },
+  });
+
+  if (!request.envelopeId) {
+    throw new AppError(AppErrorCode.INVALID_REQUEST, { message: 'Signing request has no native envelope' });
+  }
+
+  if (!reason || reason.trim().length === 0) {
+    throw new AppError(AppErrorCode.INVALID_REQUEST, { message: 'Cancellation reason is required' });
+  }
+
+  await cancelDocument({
+    id: { type: 'envelopeId', id: request.envelopeId },
+    userId,
+    teamId,
+    reason,
+    requestMetadata,
+  });
+
+  await prisma.$transaction(async (tx) => {
+    const enqueueDeliveries: string[] = [];
+
+    await recordIntegrationSigningEvent({
+      tx,
+      request: {
+        id: request.id,
+        callbackUrl: request.callbackUrl,
+        callbackCorrelationId: request.callbackCorrelationId,
+        clientCorrelationId: request.clientCorrelationId,
+        correlationId: request.correlationId ?? request.id,
+      },
+      eventType: IntegrationSigningEventType.REQUEST_CANCELLED,
+      source: IntegrationSigningEventSource.API,
+      deduplicationKey: `request-cancelled:${request.id}:${Date.now()}`,
+      eventTimestamp: new Date(),
+      statusAfter: IntegrationSigningRequestStatus.CANCELLED,
+      nativeEnvelopeId: request.envelopeId,
+      actorReference: 'api',
+      metadata: { reason, clientCorrelationId },
+      enqueueDeliveries,
+    });
+
+    await tx.integrationSigningRequest.update({
+      where: { id: request.id },
+      data: { status: IntegrationSigningRequestStatus.CANCELLED },
+    });
+  });
+
+  return getIntegrationApiV1SigningRequest({ requestId, teamId, skipReconciliation: true });
+};
+
+const recordReminderAttemptEvent = async ({
+  request,
+  participant,
+  requestParticipant,
+  status,
+  rateLimitReason,
+  now,
+}: {
+  request: {
+    id: string;
+    callbackUrl: string | null;
+    callbackCorrelationId: string | null;
+    clientCorrelationId: string | null;
+    correlationId: string | null;
+    status: IntegrationSigningRequestStatus;
+    envelopeId: string | null;
+  };
+  participant: { participantId: string };
+  requestParticipant: { id: string; nativeRecipientId: number | null };
+  status: 'SENT' | 'RATE_LIMITED' | 'BLOCKED';
+  rateLimitReason?: string;
+  now: Date;
+}) => {
+  const eventType =
+    status === 'SENT' ? IntegrationSigningEventType.REMINDER_SENT : IntegrationSigningEventType.REMINDER_ATTEMPTED;
+
+  await prisma.$transaction(async (tx) => {
+    const enqueueDeliveries: string[] = [];
+
+    await recordIntegrationSigningEvent({
+      tx,
+      request: {
+        id: request.id,
+        callbackUrl: request.callbackUrl,
+        callbackCorrelationId: request.callbackCorrelationId,
+        clientCorrelationId: request.clientCorrelationId,
+        correlationId: request.correlationId ?? request.id,
+      },
+      eventType,
+      source: IntegrationSigningEventSource.API,
+      deduplicationKey: `${status === 'SENT' ? 'reminder-sent' : 'reminder-attempted'}:${requestParticipant.nativeRecipientId ?? requestParticipant.id}:${now.getTime()}`,
+      eventTimestamp: now,
+      statusAfter: request.status,
+      nativeEnvelopeId: request.envelopeId,
+      nativeRecipientId: requestParticipant.nativeRecipientId ?? undefined,
+      actorReference: participant.participantId,
+      participantId: participant.participantId,
+      metadata: { deliveryStatus: status, rateLimitReason },
+      enqueueDeliveries,
+    });
+  });
+};
+
+export const remindIntegrationApiV1SigningRequestParticipant = async ({
+  requestId,
+  participantId,
+  teamId,
+  userId,
+  clientCorrelationId,
+  requestMetadata,
+}: {
+  requestId: string;
+  participantId: string;
+  teamId: number;
+  userId: number;
+  clientCorrelationId?: string;
+  requestMetadata: ApiRequestMetadata;
+}) => {
+  if (!INTEGRATION_API_V1_REMINDER_ENABLED()) {
+    throw new AppError(AppErrorCode.INVALID_REQUEST, { message: 'Reminders are disabled' });
+  }
+
+  const snapshot = await getIntegrationApiV1SigningRequest({
+    requestId,
+    teamId,
+    skipReconciliation: true,
+  });
+
+  assertIntegrationRequestNotTerminal(snapshot.status);
+
+  if (snapshot.status !== 'IN_PROGRESS' && snapshot.status !== 'PARTIALLY_COMPLETED') {
+    throw new AppError(AppErrorCode.INVALID_REQUEST, { message: 'Request must be active to send reminders' });
+  }
+
+  const request = await prisma.integrationSigningRequest.findFirstOrThrow({
+    where: { id: requestId, teamId },
+    include: { events: true, participants: true },
+  });
+
+  if (!request.envelopeId) {
+    throw new AppError(AppErrorCode.INVALID_REQUEST, { message: 'Signing request has no native envelope' });
+  }
+
+  const participant = snapshot.participants.find((p) => p.participantId === participantId);
+  const requestParticipant = request.participants.find((p) => p.participantId === participantId);
+
+  if (!participant || !requestParticipant) {
+    throw new AppError(AppErrorCode.NOT_FOUND, { message: 'Participant not found' });
+  }
+  if (!requestParticipant.nativeRecipientId) {
+    throw new AppError(AppErrorCode.INVALID_REQUEST, { message: 'Participant has no native recipient' });
+  }
+
+  if (participant.status !== 'AVAILABLE' && participant.status !== 'VIEWED') {
+    throw new AppError(AppErrorCode.INVALID_REQUEST, { message: 'Participant is not actionable' });
+  }
+
+  const reminderEvents = request.events.filter((e) => e.eventType === IntegrationSigningEventType.REMINDER_SENT);
+  const now = new Date();
+
+  const minInterval = INTEGRATION_API_V1_REMINDER_MIN_INTERVAL_SECONDS();
+  const maxPerDay = INTEGRATION_API_V1_REMINDER_MAX_PER_DAY();
+  const maxPerRequest = INTEGRATION_API_V1_REMINDER_MAX_PER_REQUEST();
+
+  if (reminderEvents.length >= maxPerRequest) {
+    await recordReminderAttemptEvent({
+      request,
+      participant,
+      requestParticipant,
+      status: 'RATE_LIMITED',
+      rateLimitReason: `Exceeded max reminders per request (${maxPerRequest})`,
+      now,
+    });
+
+    throw new AppError(AppErrorCode.TOO_MANY_REQUESTS, {
+      message: `Exceeded max reminders per request (${maxPerRequest})`,
+    });
+  }
+
+  const recentReminders = reminderEvents.filter((e) => e.createdAt.getTime() > now.getTime() - 24 * 60 * 60 * 1000);
+  if (recentReminders.length >= maxPerDay) {
+    await recordReminderAttemptEvent({
+      request,
+      participant,
+      requestParticipant,
+      status: 'RATE_LIMITED',
+      rateLimitReason: `Exceeded max reminders per day (${maxPerDay})`,
+      now,
+    });
+
+    throw new AppError(AppErrorCode.TOO_MANY_REQUESTS, { message: `Exceeded max reminders per day (${maxPerDay})` });
+  }
+
+  const lastReminder = reminderEvents.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  if (lastReminder && now.getTime() - lastReminder.createdAt.getTime() < minInterval * 1000) {
+    await recordReminderAttemptEvent({
+      request,
+      participant,
+      requestParticipant,
+      status: 'RATE_LIMITED',
+      rateLimitReason: `Min interval ${minInterval}s not elapsed`,
+      now,
+    });
+
+    throw new AppError(AppErrorCode.TOO_MANY_REQUESTS, {
+      message: `Please wait ${minInterval} seconds before sending another reminder`,
+    });
+  }
+
+  await resendDocument({
+    id: { type: 'envelopeId', id: request.envelopeId },
+    userId,
+    teamId,
+    recipients: [requestParticipant.nativeRecipientId],
+    requestMetadata,
+  });
+
+  await recordReminderAttemptEvent({
+    request,
+    participant,
+    requestParticipant,
+    status: 'SENT',
+    now,
+  });
+
+  return getIntegrationApiV1SigningRequest({ requestId, teamId, skipReconciliation: true });
 };

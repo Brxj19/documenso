@@ -7,7 +7,10 @@ import { initContract } from '@ts-rest/core';
 import {
   INTEGRATION_API_V1_CAPABILITIES_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUEST_ARTIFACTS_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUEST_CANCEL_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUEST_EVIDENCE_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUEST_REJECT_PARTICIPANT_ROUTE,
+  INTEGRATION_API_V1_SIGNING_REQUEST_REMIND_PARTICIPANT_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUEST_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUEST_SEND_ROUTE,
   INTEGRATION_API_V1_SIGNING_REQUESTS_ROUTE,
@@ -15,11 +18,14 @@ import {
 } from './integration/route';
 import {
   ZIntegrationApiV1ArtifactListResponseSchema,
+  ZIntegrationApiV1CancelRequestSchema,
   ZIntegrationApiV1CreateSigningRequestResponseSchema,
   ZIntegrationApiV1CreateSigningSessionResponseSchema,
   ZIntegrationApiV1CreateSigningSessionSchema,
   ZIntegrationApiV1EvidenceResponseSchema,
   ZIntegrationApiV1HealthResponseSchema,
+  ZIntegrationApiV1RejectRequestSchema,
+  ZIntegrationApiV1RemindRequestSchema,
   ZIntegrationApiV1SigningRequestResponseSchema,
   ZIntegrationApiV1SigningRequestSchema,
 } from './integration/schema';
@@ -168,6 +174,56 @@ export const ApiContractV1 = c.router(
       summary: 'Create a recipient-scoped signing session',
       description:
         'Creates a bounded redirect-mode signing session for one currently actionable participant on an active integration signing request. The response returns a launch URL that validates expiry, participant scope, and safe return URL handling before redirecting into the native Documenso signer.',
+    },
+
+    rejectIntegrationSigningRequestParticipant: {
+      method: 'POST',
+      path: INTEGRATION_API_V1_SIGNING_REQUEST_REJECT_PARTICIPANT_ROUTE,
+      body: ZIntegrationApiV1RejectRequestSchema,
+      responses: {
+        200: ZIntegrationApiV1SigningRequestResponseSchema,
+        400: ZUnsuccessfulResponseSchema,
+        401: ZUnsuccessfulResponseSchema,
+        404: ZUnsuccessfulResponseSchema,
+        409: ZUnsuccessfulResponseSchema,
+        500: ZUnsuccessfulResponseSchema,
+      },
+      summary: 'Reject a participant on a signing request',
+      description:
+        'Rejects an eligible participant on an active signing request. The participant must belong to the request and the request must be non-terminal. A rejection reason is required. The request becomes REJECTED and later participants become unavailable.',
+    },
+
+    cancelIntegrationSigningRequest: {
+      method: 'POST',
+      path: INTEGRATION_API_V1_SIGNING_REQUEST_CANCEL_ROUTE,
+      body: ZIntegrationApiV1CancelRequestSchema,
+      responses: {
+        200: ZIntegrationApiV1SigningRequestResponseSchema,
+        400: ZUnsuccessfulResponseSchema,
+        401: ZUnsuccessfulResponseSchema,
+        404: ZUnsuccessfulResponseSchema,
+        500: ZUnsuccessfulResponseSchema,
+      },
+      summary: 'Cancel/void a signing request',
+      description:
+        'Cancels or voids a non-terminal signing request. The caller must be authenticated and authorized under existing team ownership conventions. A cancellation reason is required. The request becomes CANCELLED and all signing sessions become invalid.',
+    },
+
+    remindIntegrationSigningRequestParticipant: {
+      method: 'POST',
+      path: INTEGRATION_API_V1_SIGNING_REQUEST_REMIND_PARTICIPANT_ROUTE,
+      body: ZIntegrationApiV1RemindRequestSchema,
+      responses: {
+        200: ZIntegrationApiV1SigningRequestResponseSchema,
+        400: ZUnsuccessfulResponseSchema,
+        401: ZUnsuccessfulResponseSchema,
+        404: ZUnsuccessfulResponseSchema,
+        429: ZUnsuccessfulResponseSchema,
+        500: ZUnsuccessfulResponseSchema,
+      },
+      summary: 'Send a reminder to a signing participant',
+      description:
+        'Sends a signing reminder to an eligible actionable participant. The request must be active and non-terminal. Reminder attempts are rate-limited per request and per day. Rate-limited and rejected attempts are recorded as evidence events.',
     },
 
     getDocuments: {

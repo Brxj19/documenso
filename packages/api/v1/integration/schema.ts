@@ -273,12 +273,16 @@ export const ZIntegrationApiV1EventTypeSchema = z.enum([
   'REQUEST_PARTIALLY_COMPLETED',
   'REQUEST_COMPLETED',
   'REQUEST_REJECTED',
+  'REQUEST_CANCELLED',
+  'REQUEST_EXPIRED',
   'REQUEST_FAILED',
   'FINAL_ARTIFACT_CAPTURED',
   'CALLBACK_QUEUED',
   'CALLBACK_DELIVERED',
   'CALLBACK_FAILED',
   'RECONCILIATION_REFRESHED',
+  'REMINDER_SENT',
+  'REMINDER_ATTEMPTED',
 ]);
 
 export const ZIntegrationApiV1EventSourceSchema = z.enum([
@@ -379,6 +383,7 @@ export const ZIntegrationApiV1SigningRequestTimelineEntrySchema = z.object({
   status: ZIntegrationApiV1ParticipantStatusSchema,
   statusUpdatedAt: z.string().datetime().optional(),
   completedAt: z.string().datetime().optional(),
+  rejectedAt: z.string().datetime().optional(),
   isActionable: z.boolean(),
   isBlocked: z.boolean(),
   blockedReason: ZIntegrationApiV1BlockedReasonSchema.optional(),
@@ -429,6 +434,26 @@ export const ZIntegrationApiV1DocumentCountCapabilitySchema = z.object({
   maximum: z.number().int().min(1).nullable(),
   multipleDocuments: z.boolean(),
 });
+
+export const ZIntegrationApiV1RejectRequestSchema = z.object({
+  reason: z.string().trim().min(1).max(255),
+  clientCorrelationId: z.string().trim().min(1).max(255).optional(),
+});
+
+export type TIntegrationApiV1RejectRequestSchema = z.infer<typeof ZIntegrationApiV1RejectRequestSchema>;
+
+export const ZIntegrationApiV1CancelRequestSchema = z.object({
+  reason: z.string().trim().min(1).max(255),
+  clientCorrelationId: z.string().trim().min(1).max(255).optional(),
+});
+
+export type TIntegrationApiV1CancelRequestSchema = z.infer<typeof ZIntegrationApiV1CancelRequestSchema>;
+
+export const ZIntegrationApiV1RemindRequestSchema = z.object({
+  clientCorrelationId: z.string().trim().min(1).max(255).optional(),
+});
+
+export type TIntegrationApiV1RemindRequestSchema = z.infer<typeof ZIntegrationApiV1RemindRequestSchema>;
 
 export const ZIntegrationApiV1CreateSigningSessionSchema = z.object({
   returnUrl: z.string().trim().min(1).max(2_000).optional(),
@@ -559,7 +584,14 @@ export const ZIntegrationApiV1CapabilitySchema = z.object({
   integrityVerificationTested: z.literal(true),
   supportedCallbackModes: z.array(z.enum(['PER_REQUEST_URL'])).min(1),
   supportedDocumentCount: ZIntegrationApiV1DocumentCountCapabilitySchema,
-  releasePhase: z.literal('PHASE_5_AUDIT_EVIDENCE_CALLBACKS'),
+  rejectionSupported: z.literal(true),
+  cancellationSupported: z.literal(true),
+  expiryProcessorSupported: z.literal(true),
+  remindersSupported: z.literal(true),
+  reminderRateLimitsSupported: z.literal(true),
+  terminalStateEnforcementSupported: z.literal(true),
+  immutableCompletedRequestsSupported: z.literal(true),
+  releasePhase: z.literal('PHASE_6_LIFECYCLE_CONTROLS'),
 });
 
 export type TIntegrationApiV1CapabilitySchema = z.infer<typeof ZIntegrationApiV1CapabilitySchema>;

@@ -51,8 +51,11 @@ import {
 } from './integration/evidence';
 import { getIntegrationApiV1CapabilitiesRoute } from './integration/route';
 import {
+  cancelIntegrationApiV1SigningRequest,
   createIntegrationApiV1SigningRequest,
   getIntegrationApiV1SigningRequest,
+  rejectIntegrationApiV1SigningRequestParticipant,
+  remindIntegrationApiV1SigningRequestParticipant,
   sendIntegrationApiV1SigningRequest,
 } from './integration/signing-requests';
 import { createIntegrationApiV1SigningSession } from './integration/signing-sessions';
@@ -364,6 +367,184 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
         status: 500,
         body: {
           message: 'Failed to create signing session',
+        },
+      };
+    }
+  }),
+
+  rejectIntegrationSigningRequestParticipant: authenticatedMiddleware(async (args, user, team, { metadata }) => {
+    if (!IS_INTEGRATION_API_V1_ENABLED()) {
+      return {
+        status: 404,
+        body: {
+          message: 'Not found',
+        },
+      };
+    }
+
+    try {
+      const body = await rejectIntegrationApiV1SigningRequestParticipant({
+        requestId: args.params.requestId,
+        participantId: args.params.participantId,
+        teamId: team.id,
+        userId: user.id,
+        reason: args.body.reason,
+        clientCorrelationId: args.body.clientCorrelationId,
+        requestMetadata: metadata,
+      });
+
+      return {
+        status: 200,
+        body,
+      };
+    } catch (error) {
+      const appError = AppError.parseError(error);
+
+      if (appError.code === 'INVALID_REQUEST' || appError.code === 'INVALID_BODY') {
+        return {
+          status: 400,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      if (appError.code === 'NOT_FOUND') {
+        return {
+          status: 404,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      console.error(error);
+
+      return {
+        status: 500,
+        body: {
+          message: 'Failed to reject participant',
+        },
+      };
+    }
+  }),
+
+  cancelIntegrationSigningRequest: authenticatedMiddleware(async (args, user, team, { metadata }) => {
+    if (!IS_INTEGRATION_API_V1_ENABLED()) {
+      return {
+        status: 404,
+        body: {
+          message: 'Not found',
+        },
+      };
+    }
+
+    try {
+      const body = await cancelIntegrationApiV1SigningRequest({
+        requestId: args.params.requestId,
+        teamId: team.id,
+        userId: user.id,
+        reason: args.body.reason,
+        clientCorrelationId: args.body.clientCorrelationId,
+        requestMetadata: metadata,
+      });
+
+      return {
+        status: 200,
+        body,
+      };
+    } catch (error) {
+      const appError = AppError.parseError(error);
+
+      if (appError.code === 'INVALID_REQUEST' || appError.code === 'INVALID_BODY') {
+        return {
+          status: 400,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      if (appError.code === 'NOT_FOUND') {
+        return {
+          status: 404,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      console.error(error);
+
+      return {
+        status: 500,
+        body: {
+          message: 'Failed to cancel signing request',
+        },
+      };
+    }
+  }),
+
+  remindIntegrationSigningRequestParticipant: authenticatedMiddleware(async (args, user, team, { metadata }) => {
+    if (!IS_INTEGRATION_API_V1_ENABLED()) {
+      return {
+        status: 404,
+        body: {
+          message: 'Not found',
+        },
+      };
+    }
+
+    try {
+      const body = await remindIntegrationApiV1SigningRequestParticipant({
+        requestId: args.params.requestId,
+        participantId: args.params.participantId,
+        teamId: team.id,
+        userId: user.id,
+        clientCorrelationId: args.body.clientCorrelationId,
+        requestMetadata: metadata,
+      });
+
+      return {
+        status: 200,
+        body,
+      };
+    } catch (error) {
+      const appError = AppError.parseError(error);
+
+      if (appError.code === 'INVALID_REQUEST' || appError.code === 'INVALID_BODY') {
+        return {
+          status: 400,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      if (appError.code === 'TOO_MANY_REQUESTS') {
+        return {
+          status: 429,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      if (appError.code === 'NOT_FOUND') {
+        return {
+          status: 404,
+          body: {
+            message: appError.message,
+          },
+        };
+      }
+
+      console.error(error);
+
+      return {
+        status: 500,
+        body: {
+          message: 'Failed to send reminder',
         },
       };
     }

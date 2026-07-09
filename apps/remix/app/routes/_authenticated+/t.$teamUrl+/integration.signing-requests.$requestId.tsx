@@ -329,6 +329,12 @@ export default function IntegrationSigningRequestPage({ loaderData }: Route.Comp
                             <Trans>Completed at:</Trans> {formatDateTime(participant.completedAt)}
                           </p>
                         ) : null}
+
+                        {participant.rejectedAt ? (
+                          <p className="mt-2 text-red-500/80 text-sm">
+                            <Trans>Rejected at:</Trans> {formatDateTime(participant.rejectedAt)}
+                          </p>
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -416,6 +422,11 @@ export default function IntegrationSigningRequestPage({ loaderData }: Route.Comp
                   <span>
                     <Trans>Completed at:</Trans> {formatDateTime(entry.completedAt)}
                   </span>
+                  {entry.rejectedAt ? (
+                    <span className="text-red-500/80">
+                      <Trans>Rejected at:</Trans> {formatDateTime(entry.rejectedAt)}
+                    </span>
+                  ) : null}
                 </div>
 
                 {entry.blockedReason ? (

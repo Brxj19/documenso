@@ -54,9 +54,12 @@ const CALLBACK_ELIGIBLE_EVENT_TYPES = new Set<IntegrationSigningEventType>([
   IntegrationSigningEventType.REQUEST_PARTIALLY_COMPLETED,
   IntegrationSigningEventType.REQUEST_COMPLETED,
   IntegrationSigningEventType.REQUEST_REJECTED,
+  IntegrationSigningEventType.REQUEST_CANCELLED,
+  IntegrationSigningEventType.REQUEST_EXPIRED,
   IntegrationSigningEventType.REQUEST_FAILED,
   IntegrationSigningEventType.FINAL_ARTIFACT_CAPTURED,
   IntegrationSigningEventType.RECONCILIATION_REFRESHED,
+  IntegrationSigningEventType.REMINDER_SENT,
 ]);
 
 const clampPositiveInteger = (value: number, fallback: number) =>
@@ -591,7 +594,7 @@ const queueCallbackDeliveryForEvent = async ({
   return delivery.id;
 };
 
-const recordIntegrationSigningEvent = async ({
+export const recordIntegrationSigningEvent = async ({
   tx,
   request,
   eventType,
