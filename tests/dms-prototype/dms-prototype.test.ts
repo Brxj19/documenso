@@ -509,6 +509,13 @@ describe('Phase 10 — White Label', () => {
     expect(bodyContent).toContain('Authora DMS');
   });
 
+  it('parent layout hides global header for DMS prototype routes', () => {
+    const parentLayoutPath = path.resolve(DMS_ROUTES_DIR, '../_layout.tsx');
+    const parentContent = fs.readFileSync(parentLayoutPath, 'utf-8');
+    expect(parentContent).toContain('dms-prototype+');
+    expect(parentContent).toContain("match?.id?.startsWith('routes/_authenticated+/dms-prototype+')");
+  });
+
   it('no Documenso text in DMS prototype pages', () => {
     const files = fs.readdirSync(DMS_ROUTES_DIR);
     const tsxFiles = files.filter((f) => f.endsWith('.tsx'));

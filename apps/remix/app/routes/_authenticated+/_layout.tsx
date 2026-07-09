@@ -70,11 +70,12 @@ export default function Layout({ loaderData, params, matches }: Route.ComponentP
   const orgNotFound = params.orgUrl && !currentOrganisation;
   const teamNotFound = params.teamUrl && !currentTeam;
 
-  // Hide the header for editor routes.
+  // Hide the header for editor routes and DMS prototype routes.
   const hideHeader = matches.some(
     (match) =>
       match?.id === 'routes/_authenticated+/t.$teamUrl+/documents.$id.edit' ||
-      match?.id === 'routes/_authenticated+/t.$teamUrl+/templates.$id.edit',
+      match?.id === 'routes/_authenticated+/t.$teamUrl+/templates.$id.edit' ||
+      match?.id?.startsWith('routes/_authenticated+/dms-prototype+'),
   );
 
   if (orgNotFound || teamNotFound) {
@@ -108,11 +109,11 @@ export default function Layout({ loaderData, params, matches }: Route.ComponentP
   return (
     <OrganisationProvider organisation={currentOrganisation}>
       <TeamProvider team={currentTeam || null}>
-        <OrganisationBillingBanner />
+        {!hideHeader && <OrganisationBillingBanner />}
 
-        <OrganisationQuotaBanner />
+        {!hideHeader && <OrganisationQuotaBanner />}
 
-        {!user.emailVerified && <VerifyEmailBanner email={user.email} />}
+        {!hideHeader && !user.emailVerified && <VerifyEmailBanner email={user.email} />}
 
         {banner && !hideHeader && <AppBanner banner={banner} />}
 
